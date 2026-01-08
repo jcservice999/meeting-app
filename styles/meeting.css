@@ -117,7 +117,7 @@
     overflow: hidden;
     transition: all 0.2s ease;
     width: 100%;
-    aspect-ratio: 16 / 9;
+    height: 100%;
 }
 
 .participant-card.speaking {
