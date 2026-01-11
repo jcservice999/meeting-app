@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>創建會議室</title>
+    <link rel="stylesheet" href="styles/common.css">
+    <style>
+        .create-room-container {
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+
+        .form-group textarea {
+            min-height: 150px;
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        .help-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .room-info {
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .room-id {
+            font-family: monospace;
+            font-size: 1.2rem;
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="create-room-container">
+        <h1>創建會議室</h1>
+        
+        <form id="createRoomForm">
+            <div class="form-group">
+                <label for="roomName">會議室名稱 *</label>
+                <input 
+                    type="text" 
+                    id="roomName" 
+                    required 
+                    placeholder="例如：每週例會、專案討論"
+                    maxlength="100"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="allowedEmails">允許的 Email 列表 *</label>
+                <textarea 
+                    id="allowedEmails" 
+                    required 
+                    placeholder="每行一個 email&#10;user1@example.com&#10;user2@example.com&#10;user3@example.com"
+                ></textarea>
+                <div class="help-text">
+                    每行輸入一個 email 地址，只有這些使用者可以進入此會議室
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button type="button" class="btn btn-secondary" onclick="window.location.href='index.html'">
+                    取消
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    創建會議室
+                </button>
+            </div>
+        </form>
+
+        <div id="roomInfo" class="room-info" style="display: none;">
+            <h3>✅ 會議室創建成功！</h3>
+            <p>會議室 ID：<span class="room-id" id="generatedRoomId"></span></p>
+            <p>請將此 ID 分享給允許進入的成員</p>
+            <button class="btn btn-primary" onclick="window.location.href='rooms.html'">
+                查看我的會議室
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script>
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+
+        // 檢查登入狀態
+        async function checkAuth() {
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (!user) {
+                alert('請先登入');
+                window.location.href = 'index.html';
+                return;
+            }
+            currentUser = user;
+        }
+
+        // 生成房間 ID
+        function generateRoomId() {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < 10; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        // 創建房間
+        document.getElementById('createRoomForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const roomName = document.getElementById('roomName').value.trim();
+            const emailsText = document.getElementById('allowedEmails').value.trim();
+
+            // 解析 email 列表
+            const emails = emailsText
+                .split('\n')
+                .map(e => e.trim())
+                .filter(e => e.length > 0);
+
+            // 驗證 email 格式
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const invalidEmails = emails.filter(e => !emailRegex.test(e));
+            
+            if (invalidEmails.length > 0) {
+                alert('以下 email 格式不正確：\n' + invalidEmails.join('\n'));
+                return;
+            }
+
+            if (emails.length === 0) {
+                alert('請至少輸入一個 email');
+                return;
+            }
+
+            // 生成房間 ID
+            const roomId = generateRoomId();
+
+            try {
+                // 創建房間
+                const { error: roomError } = await supabaseClient
+                    .from('rooms')
+                    .insert({
+                        room_id: roomId,
+                        room_name: roomName,
+                        created_by: currentUser.id
+                    });
+
+                if (roomError) throw roomError;
+
+                // 加入存取列表
+                const accessRecords = emails.map(email => ({
+                    room_id: roomId,
+                    email: email,
+                    added_by: currentUser.id
+                }));
+
+                const { error: accessError } = await supabaseClient
+                    .from('room_access')
+                    .insert(accessRecords);
+
+                if (accessError) throw accessError;
+
+                // 顯示成功訊息
+                document.getElementById('createRoomForm').style.display = 'none';
+                document.getElementById('roomInfo').style.display = 'block';
+                document.getElementById('generatedRoomId').textContent = roomId;
+
+            } catch (error) {
+                console.error('創建房間失敗:', error);
+                alert('創建房間失敗：' + error.message);
+            }
+        });
+
+        // 初始化
+        checkAuth();
+    </script>
+</body>
+</html>

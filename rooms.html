@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的會議室</title>
+    <link rel="stylesheet" href="styles/common.css">
+    <style>
+        .rooms-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+
+        .section {
+            margin-bottom: 3rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .room-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .room-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            transition: all 0.2s;
+        }
+
+        .room-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .room-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .room-id {
+            font-family: monospace;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .room-info {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .room-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+            flex: 1;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c53030;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="rooms-container">
+        <h1>我的會議室</h1>
+
+        <!-- 我創建的房間 -->
+        <div class="section">
+            <div class="section-header">
+                <h2>我創建的房間</h2>
+                <button class="btn btn-primary" onclick="window.location.href='create-room.html'">
+                    + 創建新房間
+                </button>
+            </div>
+            <div id="myRooms" class="room-grid">
+                <div class="empty-state">載入中...</div>
+            </div>
+        </div>
+
+        <!-- 我可以進入的房間 -->
+        <div class="section">
+            <div class="section-header">
+                <h2>我可以進入的房間</h2>
+            </div>
+            <div id="accessibleRooms" class="room-grid">
+                <div class="empty-state">載入中...</div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 2rem;">
+            <button class="btn btn-primary" onclick="window.location.href='index.html'">
+                返回首頁
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script>
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+
+        // 檢查登入狀態
+        async function checkAuth() {
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (!user) {
+                alert('請先登入');
+                window.location.href = 'index.html';
+                return;
+            }
+            currentUser = user;
+            loadRooms();
+        }
+
+        // 載入房間列表
+        async function loadRooms() {
+            await Promise.all([
+                loadMyRooms(),
+                loadAccessibleRooms()
+            ]);
+        }
+
+        // 載入我創建的房間
+        async function loadMyRooms() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('rooms')
+                    .select('*')
+                    .eq('created_by', currentUser.id)
+                    .eq('is_active', true)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                const container = document.getElementById('myRooms');
+
+                if (data.length === 0) {
+                    container.innerHTML = '<div class="empty-state">尚未創建任何房間</div>';
+                    return;
+                }
+
+                container.innerHTML = data.map(room => `
+                    <div class="room-card">
+                        <div class="room-name">${escapeHtml(room.room_name)}</div>
+                        <div class="room-id">ID: ${room.room_id}</div>
+                        <div class="room-info">
+                            創建時間：${new Date(room.created_at).toLocaleString('zh-TW')}
+                        </div>
+                        <div class="room-actions">
+                            <button class="btn btn-primary" onclick="joinRoom('${room.room_id}')">
+                                進入會議
+                            </button>
+                            <button class="btn btn-danger" onclick="deleteRoom('${room.room_id}')">
+                                刪除
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('載入房間失敗:', error);
+                document.getElementById('myRooms').innerHTML =
+                    '<div class="empty-state">載入失敗</div>';
+            }
+        }
+
+        // 載入我可以進入的房間
+        async function loadAccessibleRooms() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('room_access')
+                    .select('room_id, rooms(room_name, created_at)')
+                    .eq('email', currentUser.email);
+
+                if (error) throw error;
+
+                const container = document.getElementById('accessibleRooms');
+
+                if (data.length === 0) {
+                    container.innerHTML = '<div class="empty-state">沒有可進入的房間</div>';
+                    return;
+                }
+
+                container.innerHTML = data.map(access => `
+                    <div class="room-card">
+                        <div class="room-name">${escapeHtml(access.rooms.room_name)}</div>
+                        <div class="room-id">ID: ${access.room_id}</div>
+                        <div class="room-info">
+                            創建時間：${new Date(access.rooms.created_at).toLocaleString('zh-TW')}
+                        </div>
+                        <div class="room-actions">
+                            <button class="btn btn-primary" onclick="joinRoom('${access.room_id}')">
+                                進入會議
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('載入房間失敗:', error);
+                document.getElementById('accessibleRooms').innerHTML =
+                    '<div class="empty-state">載入失敗</div>';
+            }
+        }
+
+        // 進入房間
+        function joinRoom(roomId) {
+            window.location.href = `meeting.html?room=${roomId}`;
+        }
+
+        // 刪除房間
+        async function deleteRoom(roomId) {
+            if (!confirm('確定要刪除此房間嗎？')) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('rooms')
+                    .update({ is_active: false })
+                    .eq('room_id', roomId);
+
+                if (error) throw error;
+
+                alert('房間已刪除');
+                loadRooms();
+
+            } catch (error) {
+                console.error('刪除房間失敗:', error);
+                alert('刪除失敗：' + error.message);
+            }
+        }
+
+        // HTML 轉義
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 初始化
+        checkAuth();
+    </script>
+</body>
+
+</html>

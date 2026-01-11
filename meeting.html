@@ -56,8 +56,10 @@
     <script>
         console.log('=== 多人會議室初始化 ===');
 
-        // 固定的會議室 ID（所有人都加入這個房間）
-        const MEETING_ID = 'main-room';
+        // 從 URL 取得房間 ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const MEETING_ID = urlParams.get('room') || 'main-room';
+        console.log('會議室 ID:', MEETING_ID);
 
         // 初始化 Supabase
         const { createClient } = supabase;
@@ -77,6 +79,38 @@
         let participantsChannel = null;
         let captionsChannel = null;
 
+        // 檢查房間存取權限
+        async function checkRoomAccess() {
+            // 如果是預設房間，不檢查權限
+            if (MEETING_ID === 'main-room') {
+                return true;
+            }
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('room_access')
+                    .select('*')
+                    .eq('room_id', MEETING_ID)
+                    .eq('email', currentUser.email)
+                    .single();
+
+                if (error || !data) {
+                    alert('您沒有權限進入此會議室');
+                    window.location.href = 'rooms.html';
+                    return false;
+                }
+
+                console.log('✅ 權限驗證通過');
+                return true;
+
+            } catch (error) {
+                console.error('權限檢查失敗:', error);
+                alert('權限檢查失敗');
+                window.location.href = 'index.html';
+                return false;
+            }
+        }
+
         // 檢查登入狀態並加入會議
         supabaseClient.auth.getSession().then(async ({ data: { session } }) => {
             if (!session) {
@@ -86,6 +120,10 @@
 
             currentUser = session.user;
             console.log('✅ 使用者已登入', currentUser.email);
+
+            // 檢查房間權限
+            const hasAccess = await checkRoomAccess();
+            if (!hasAccess) return;
 
             // 加入會議室
             await joinMeeting();
