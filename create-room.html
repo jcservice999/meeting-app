@@ -214,12 +214,21 @@
 
                 if (roomError) throw roomError;
 
-                // 加入存取列表
+                // 加入存取列表（包含創建者自己）
                 const accessRecords = emails.map(email => ({
                     room_id: roomId,
                     email: email,
                     added_by: currentUser.id
                 }));
+
+                // 確保創建者的 email 也在列表中
+                if (!emails.includes(currentUser.email)) {
+                    accessRecords.push({
+                        room_id: roomId,
+                        email: currentUser.email,
+                        added_by: currentUser.id
+                    });
+                }
 
                 const { error: accessError } = await supabaseClient
                     .from('room_access')
