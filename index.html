@@ -179,7 +179,7 @@
             const { error } = await supabaseClient.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin + '/meeting-APP/index.html'
+                    redirectTo: 'https://jcservice999.github.io/meeting-APP/index.html'
                 }
             });
 
@@ -196,9 +196,20 @@
         }
 
         // 綁定登入按鈕
-        document.getElementById('loginBtn').addEventListener('click', loginWithGoogle);
+        const loginBtn = document.getElementById('loginBtn');
+        console.log('登入按鈕:', loginBtn);
+
+        if (loginBtn) {
+            loginBtn.addEventListener('click', () => {
+                console.log('登入按鈕被點擊');
+                loginWithGoogle();
+            });
+        } else {
+            console.error('找不到登入按鈕！');
+        }
 
         // 初始化
+        console.log('開始檢查登入狀態');
         checkLoginStatus();
     </script>
 </body>
