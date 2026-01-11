@@ -1,0 +1,3 @@
+// Supabase 配置
+const SUPABASE_URL = 'https://inzqsdelrwxxlbcumaiw.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImluenFzZGVscnd4eGxiY3VtYWl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU5NzY1NTUsImV4cCI6MjA1MTU1MjU1NX0.6icGBhWdbQ9a73nIrHKpQ_YWsZKzZs';
