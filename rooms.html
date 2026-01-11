@@ -222,19 +222,22 @@
             try {
                 const { data, error } = await supabaseClient
                     .from('room_access')
-                    .select('room_id, rooms(room_name, created_at)')
+                    .select('room_id, rooms(room_name, created_at, is_active)')
                     .eq('email', currentUser.email);
 
                 if (error) throw error;
 
+                // 過濾掉已刪除的房間
+                const activeRooms = data.filter(access => access.rooms && access.rooms.is_active);
+
                 const container = document.getElementById('accessibleRooms');
 
-                if (data.length === 0) {
+                if (activeRooms.length === 0) {
                     container.innerHTML = '<div class="empty-state">沒有可進入的房間</div>';
                     return;
                 }
 
-                container.innerHTML = data.map(access => `
+                container.innerHTML = activeRooms.map(access => `
                     <div class="room-card">
                         <div class="room-name">${escapeHtml(access.rooms.room_name)}</div>
                         <div class="room-id">ID: ${access.room_id}</div>
