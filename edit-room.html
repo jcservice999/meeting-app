@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>編輯會議室</title>
+    <link rel="stylesheet" href="styles/common.css">
+    <style>
+        .edit-room-container {
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+
+        .form-group textarea {
+            min-height: 150px;
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        .help-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .current-emails {
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .email-tag {
+            display: inline-block;
+            background: var(--primary-color);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            margin: 0.25rem;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="edit-room-container">
+        <h1>編輯會議室</h1>
+
+        <div class="form-group">
+            <label>會議室名稱</label>
+            <input type="text" id="roomName" readonly>
+        </div>
+
+        <div class="form-group">
+            <label>會議室 ID</label>
+            <input type="text" id="roomId" readonly>
+        </div>
+
+        <div class="form-group">
+            <label>目前允許的 Email</label>
+            <div id="currentEmails" class="current-emails">
+                載入中...
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="newEmails">新增 Email</label>
+            <textarea id="newEmails" placeholder="每行一個 email&#10;user4@example.com&#10;user5@example.com"></textarea>
+            <div class="help-text">
+                輸入要新增的 email 地址，每行一個
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button type="button" class="btn btn-secondary" onclick="window.location.href='rooms.html'">
+                取消
+            </button>
+            <button type="button" class="btn btn-primary" onclick="addEmails()">
+                新增 Email
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Supabase 配置
+        const SUPABASE_URL = 'https://inzqsdelrwxxlbcumaiw.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImluenFzZGVscnd4eGxiY3VtYWl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MTQzMjksImV4cCI6MjA4MzI5MDMyOX0.XBrMbxu_vcNQb55v6OZNoB-Mm1w-A2OtJk1AAgofjg0';
+
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+        let roomId = null;
+
+        // 檢查登入狀態
+        async function checkAuth() {
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (!user) {
+                alert('請先登入');
+                window.location.href = 'index.html';
+                return;
+            }
+            currentUser = user;
+        }
+
+        // 載入房間資訊
+        async function loadRoom() {
+            const urlParams = new URLSearchParams(window.location.search);
+            roomId = urlParams.get('room');
+
+            if (!roomId) {
+                alert('缺少房間 ID');
+                window.location.href = 'rooms.html';
+                return;
+            }
+
+            try {
+                // 載入房間資訊
+                const { data: room, error: roomError } = await supabaseClient
+                    .from('rooms')
+                    .select('*')
+                    .eq('room_id', roomId)
+                    .single();
+
+                if (roomError) throw roomError;
+
+                // 檢查是否為創建者
+                if (room.created_by !== currentUser.id) {
+                    alert('只有創建者可以編輯房間');
+                    window.location.href = 'rooms.html';
+                    return;
+                }
+
+                document.getElementById('roomName').value = room.room_name;
+                document.getElementById('roomId').value = room.room_id;
+
+                // 載入允許的 email 列表
+                const { data: access, error: accessError } = await supabaseClient
+                    .from('room_access')
+                    .select('email')
+                    .eq('room_id', roomId);
+
+                if (accessError) throw accessError;
+
+                const emailsHtml = access.map(a => `<span class="email-tag">${a.email}</span>`).join('');
+                document.getElementById('currentEmails').innerHTML = emailsHtml || '無';
+
+            } catch (error) {
+                console.error('載入房間失敗:', error);
+                alert('載入房間失敗：' + error.message);
+            }
+        }
+
+        // 新增 Email
+        async function addEmails() {
+            const newEmailsText = document.getElementById('newEmails').value.trim();
+
+            if (!newEmailsText) {
+                alert('請輸入要新增的 email');
+                return;
+            }
+
+            // 解析 email 列表
+            const newEmails = newEmailsText
+                .split('\n')
+                .map(e => e.trim())
+                .filter(e => e.length > 0);
+
+            // 驗證 email 格式
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const invalidEmails = newEmails.filter(e => !emailRegex.test(e));
+
+            if (invalidEmails.length > 0) {
+                alert('以下 email 格式不正確：\n' + invalidEmails.join('\n'));
+                return;
+            }
+
+            try {
+                // 新增到存取列表
+                const accessRecords = newEmails.map(email => ({
+                    room_id: roomId,
+                    email: email,
+                    added_by: currentUser.id
+                }));
+
+                const { error } = await supabaseClient
+                    .from('room_access')
+                    .insert(accessRecords);
+
+                if (error) throw error;
+
+                alert('Email 已新增！');
+                document.getElementById('newEmails').value = '';
+                loadRoom(); // 重新載入
+
+            } catch (error) {
+                console.error('新增 Email 失敗:', error);
+                if (error.code === '23505') {
+                    alert('部分 email 已經在列表中');
+                } else {
+                    alert('新增失敗：' + error.message);
+                }
+            }
+        }
+
+        // 初始化
+        checkAuth().then(() => loadRoom());
+    </script>
+</body>
+
+</html>
