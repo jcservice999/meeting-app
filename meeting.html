@@ -305,15 +305,26 @@
                     language === 'en-US' ? 'en' :
                         language === 'ja-JP' ? 'ja' : 'zh-TW';
 
-                // 建立 Deepgram WebSocket 連線
-                const deepgramUrl = `wss://api.deepgram.com/v1/listen?model=nova-2&language=${langCode}&smart_format=true&punctuate=true&interim_results=true`;
+                // 建立 Deepgram WebSocket 連線 - 優化參數
+                const deepgramParams = new URLSearchParams({
+                    model: 'nova-2',           // 最新模型
+                    language: langCode,
+                    smart_format: 'true',      // 智能格式化
+                    punctuate: 'true',         // 自動標點
+                    interim_results: 'true',   // 即時結果
+                    utterance_end_ms: '1500',  // 句子結束等待 1.5 秒（防止截斷）
+                    endpointing: '500',        // 語音停頓檢測 500ms
+                    vad_events: 'true',        // 語音活動檢測
+                    diarize: 'true'            // 多人說話辨識
+                });
+                const deepgramUrl = `wss://api.deepgram.com/v1/listen?${deepgramParams.toString()}`;
 
                 deepgramSocket = new WebSocket(deepgramUrl, ['token', apiKey]);
 
                 deepgramSocket.onopen = () => {
-                    console.log('✅ Deepgram WebSocket 已連線');
+                    console.log('✅ Deepgram WebSocket 已連線（優化版）');
 
-                    // 開始錄音並傳送到 Deepgram
+                    // 開始錄音並傳送到 Deepgram - 增加間隔到 500ms
                     mediaRecorder = new MediaRecorder(audioStream, {
                         mimeType: 'audio/webm;codecs=opus'
                     });
@@ -324,11 +335,12 @@
                         }
                     };
 
-                    mediaRecorder.start(250);
+                    mediaRecorder.start(500); // 每 500ms 傳送一次（減少切割）
                 };
 
                 let transcriptBuffer = '';
                 let lastTranscriptTime = Date.now();
+                let saveTimeout = null;
 
                 deepgramSocket.onmessage = (event) => {
                     const data = JSON.parse(event.data);
@@ -336,6 +348,7 @@
                     if (data.channel?.alternatives?.[0]) {
                         const transcript = data.channel.alternatives[0].transcript;
                         const isFinal = data.is_final;
+                        const speechFinal = data.speech_final; // 語句完全結束
 
                         if (transcript) {
                             if (isFinal) {
@@ -343,18 +356,24 @@
                                 transcriptBuffer += transcript + ' ';
                                 lastTranscriptTime = Date.now();
 
-                                setTimeout(() => {
-                                    if (Date.now() - lastTranscriptTime >= 800 && transcriptBuffer.trim()) {
+                                // 清除之前的計時器
+                                if (saveTimeout) clearTimeout(saveTimeout);
+
+                                // 如果是語句完全結束，或等待 1.5 秒後儲存
+                                const delay = speechFinal ? 500 : 1500;
+                                saveTimeout = setTimeout(() => {
+                                    if (Date.now() - lastTranscriptTime >= delay && transcriptBuffer.trim()) {
                                         saveCaption(transcriptBuffer.trim());
                                         transcriptBuffer = '';
                                     }
-                                }, 900);
+                                }, delay + 100);
                             } else {
                                 showInterimCaption(transcript);
                             }
                         }
                     }
                 };
+
 
                 deepgramSocket.onerror = (error) => {
                     console.error('Deepgram 錯誤:', error);
