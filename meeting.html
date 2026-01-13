@@ -778,10 +778,11 @@
                 stopDeepgramStream();
                 stopRecording();
                 await leaveMeeting();
-                await supabaseClient.auth.signOut();
-                window.location.href = 'index.html';
+                // 回到房間列表，不登出
+                window.location.href = 'rooms.html';
             }
         });
+
 
         document.getElementById('languageSelect').addEventListener('change', (e) => {
             if (recognition) {
