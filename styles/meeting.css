@@ -266,8 +266,14 @@
 .caption-full {
     display: none;
     padding: 1rem;
+    padding-bottom: 80px;
+    /* 預留瀏覽器導航列空間 */
     height: calc(100vh - 60px);
     overflow-y: auto;
+    overscroll-behavior: contain;
+    /* 防止滚動穿透到後面 */
+    -webkit-overflow-scrolling: touch;
+    /* iOS 平滑滚動 */
 }
 
 .caption-container.expanded .caption-bar {
@@ -278,6 +284,8 @@
     display: flex;
     flex-direction: column;
     gap: 0.8rem;
+    touch-action: pan-y;
+    /* 只允許垂直滚動 */
 }
 
 .caption-item-full {
@@ -369,9 +377,15 @@
     }
 
     .caption-container.expanded {
-        max-height: 60vh;
-        height: 60vh;
+        max-height: calc(70vh - 60px);
+        height: calc(70vh - 60px);
         bottom: 60px;
+    }
+
+    .caption-container.expanded .caption-full {
+        height: calc(70vh - 120px);
+        /* 扣除 header 和底部安全區域 */
+        padding-bottom: 80px;
     }
 
     .caption-header {
@@ -385,6 +399,7 @@
         max-height: 100px;
         overflow-y: auto;
     }
+
 }
 
 
