@@ -304,30 +304,110 @@
 /* 響應式設計 */
 @media (max-width: 768px) {
     .meeting-header {
-        padding: 0.6rem 1rem;
+        padding: 0.5rem 0.8rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .header-left {
+        flex: 1;
+        min-width: 0;
     }
 
     .header-left h1 {
-        font-size: 1rem;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
+    .participant-count {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+    }
+
+    .header-right {
+        display: flex;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .header-right .btn {
+        padding: 0.4rem 0.6rem !important;
+        font-size: 0.8rem !important;
+        white-space: nowrap;
+    }
+
+    .language-select {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.8rem;
+        min-width: 50px;
+    }
+
+    /* 參與者網格 - 手機優化 */
     .participant-grid {
-        grid-template-columns: 1fr !important;
         gap: 6px;
         padding: 6px;
     }
 
-    .photo-placeholder {
-        font-size: 3rem;
+    /* 1人時全螢幕 */
+    .participant-grid[data-count="1"] {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr;
     }
 
+    /* 2人時上下排列 */
+    .participant-grid[data-count="2"] {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
+
+    /* 3-4人時 2x2 網格 */
+    .participant-grid[data-count="3"],
+    .participant-grid[data-count="4"] {
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+    }
+
+    /* 5-6人時 2x3 網格 */
+    .participant-grid[data-count="5"],
+    .participant-grid[data-count="6"] {
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+    }
+
+    /* 7-9人時 3x3 網格 */
+    .participant-grid[data-count="7"],
+    .participant-grid[data-count="8"],
+    .participant-grid[data-count="9"] {
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+    }
+
+    .participant-card {
+        border-radius: 6px;
+        min-height: 120px;
+    }
+
+    .participant-name {
+        font-size: 0.75rem;
+        padding: 3px 8px;
+        bottom: 4px;
+        left: 4px;
+    }
+
+    .photo-placeholder {
+        font-size: 2.5rem;
+    }
+
+    /* 字幕容器優化 */
     .caption-container {
-        max-height: 120px;
+        max-height: 100px;
     }
 
     .caption-container.expanded {
-        max-height: 80vh;
-        height: 80vh;
+        max-height: 70vh;
+        height: 70vh;
     }
 
     .caption-header {
@@ -335,8 +415,61 @@
         top: 0;
         z-index: 100;
         background: rgba(0, 0, 0, 0.95);
+        padding: 0.4rem 0.8rem;
+    }
+
+    .caption-header span {
+        font-size: 0.8rem;
+    }
+
+    .caption-bar {
+        padding: 0.5rem 0.8rem;
+        max-height: 60px;
+    }
+
+    .caption-item {
+        font-size: 0.85rem;
+    }
+
+    .caption-speaker {
+        font-size: 0.85rem;
     }
 }
+
+/* 更小螢幕優化 */
+@media (max-width: 480px) {
+    .meeting-header {
+        padding: 0.4rem 0.5rem;
+    }
+
+    .header-left h1 {
+        font-size: 0.8rem;
+    }
+
+    .header-right .btn {
+        padding: 0.3rem 0.5rem !important;
+        font-size: 0.75rem !important;
+    }
+
+    .participant-grid {
+        gap: 4px;
+        padding: 4px;
+    }
+
+    .participant-card {
+        min-height: 100px;
+    }
+
+    .photo-placeholder {
+        font-size: 2rem;
+    }
+
+    .participant-name {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+    }
+}
+
 
 /* 滾動條 */
 ::-webkit-scrollbar {
