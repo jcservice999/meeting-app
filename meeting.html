@@ -10,6 +10,8 @@
 
     <!-- Supabase SDK -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <!-- Daily.co SDK -->
+    <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
 </head>
 
 <body>
@@ -25,6 +27,8 @@
                     <option value="zh-TW">中文</option>
                     <option value="en-US">English</option>
                 </select>
+                <button id="micBtn" class="btn-secondary" title="麥克風">🎙️</button>
+                <button id="speakerBtn" class="btn-secondary" title="嗇叭">🔊</button>
                 <button id="startBtn" class="btn-primary">開始錄音</button>
                 <button id="leaveBtn" class="btn-danger">離開會議</button>
             </div>
@@ -80,6 +84,12 @@
         let participants = new Map();
         let participantsChannel = null;
         let captionsChannel = null;
+
+        // Daily.co 語音通話
+        let dailyCallObject = null;
+        let isMicOn = true;
+        let isSpeakerOn = true;
+        const DAILY_ROOM_URL = 'https://inzqsdelrwxxlbcumaiw.supabase.co/functions/v1/daily-room';
 
         // 檢查房間存取權限
         async function checkRoomAccess() {
@@ -839,6 +849,13 @@
                 if (participantsChannel) participantsChannel.unsubscribe();
                 if (captionsChannel) captionsChannel.unsubscribe();
 
+                // 斷開 Daily.co 語音
+                if (dailyCallObject) {
+                    await dailyCallObject.leave();
+                    dailyCallObject.destroy();
+                    dailyCallObject = null;
+                }
+
                 console.log('✅ 已離開會議');
             } catch (error) {
                 console.error('離開會議失敗:', error);
@@ -901,6 +918,103 @@
         });
 
         console.log('=== 會議室初始化完成 ===');
+
+        // ========== Daily.co 語音通話 ==========
+        async function initDailyVoice() {
+            try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (!session) return;
+
+                const userName = currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || 'Guest';
+
+                // 取得 Daily.co 房間 Token
+                const response = await fetch(DAILY_ROOM_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`
+                    },
+                    body: JSON.stringify({
+                        roomName: MEETING_ID,
+                        userName: userName
+                    })
+                });
+
+                const result = await response.json();
+                if (result.error) {
+                    console.error('Daily.co 錯誤:', result.error);
+                    return;
+                }
+
+                console.log('✅ Daily.co 房間取得成功');
+
+                // 建立 Daily Call
+                dailyCallObject = DailyIframe.createCallObject({
+                    audioSource: true,
+                    videoSource: false
+                });
+
+                // 加入房間
+                await dailyCallObject.join({
+                    url: result.roomUrl,
+                    token: result.token
+                });
+
+                console.log('✅ 已連接 Daily.co 語音通話');
+                updateVoiceButtons();
+
+            } catch (error) {
+                console.error('Daily.co 初始化失敗:', error);
+            }
+        }
+
+        function updateVoiceButtons() {
+            const micBtn = document.getElementById('micBtn');
+            const speakerBtn = document.getElementById('speakerBtn');
+
+            micBtn.textContent = isMicOn ? '🎙️' : '🔇';
+            micBtn.style.opacity = isMicOn ? '1' : '0.5';
+
+            speakerBtn.textContent = isSpeakerOn ? '🔊' : '🔈';
+            speakerBtn.style.opacity = isSpeakerOn ? '1' : '0.5';
+        }
+
+        // 麥克風開關
+        document.getElementById('micBtn').addEventListener('click', () => {
+            if (!dailyCallObject) {
+                alert('語音通話尚未連接');
+                return;
+            }
+            isMicOn = !isMicOn;
+            dailyCallObject.setLocalAudio(isMicOn);
+            updateVoiceButtons();
+            console.log('麥克風:', isMicOn ? '開啟' : '關閉');
+        });
+
+        // 嗇叭開關
+        document.getElementById('speakerBtn').addEventListener('click', () => {
+            if (!dailyCallObject) {
+                alert('語音通話尚未連接');
+                return;
+            }
+            isSpeakerOn = !isSpeakerOn;
+            // Daily.co 使用 setLocalAudio 來控制接收音訊
+            const participants = dailyCallObject.participants();
+            Object.keys(participants).forEach(id => {
+                if (id !== 'local') {
+                    dailyCallObject.updateParticipant(id, { setAudio: isSpeakerOn });
+                }
+            });
+            updateVoiceButtons();
+            console.log('嗇叭:', isSpeakerOn ? '開啟' : '關閉');
+        });
+
+        // 進入會議室後自動連接語音
+        setTimeout(() => {
+            if (currentUser) {
+                initDailyVoice();
+            }
+        }, 2000);
     </script>
 </body>
 
