@@ -1,6 +1,6 @@
-# OpenAI Whisper Edge Function - 優化版
+# OpenAI Whisper - 純 Prompt 版
 
-**請用這個優化版取代現有的 whisper-speech 代碼**：
+**只用 Whisper prompt，不加 GPT**：
 
 ```typescript
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -12,8 +12,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log("=== Whisper 請求 ===");
-
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -21,12 +19,11 @@ serve(async (req) => {
   try {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) {
-      return new Response(JSON.stringify({ error: "OpenAI API key not configured" }), {
+      return new Response(JSON.stringify({ error: "No API key" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    // 驗證用戶
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -35,94 +32,63 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
 
     if (token) {
-      const { data, error } = await supabase.auth.getUser(token);
-      if (error || !data?.user) {
+      const { error } = await supabase.auth.getUser(token);
+      if (error) {
         return new Response(JSON.stringify({ error: "Auth failed" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
-      console.log("✅ 用戶:", data.user.id);
     }
 
-    // 取得音訊
     const { audio, language } = await req.json();
-    if (!audio) {
-      return new Response(JSON.stringify({ error: "No audio" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // 檢查音訊大小 - 太小可能只是噪音
-    if (audio.length < 1000) {
-      console.log("⚠️ 音訊太短，跳過");
+    
+    if (!audio || audio.length < 5000) {
       return new Response(JSON.stringify({ transcript: "", success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    console.log("✅ 音訊長度:", audio.length);
-
-    // 將 base64 轉換為 blob
     const binaryAudio = Uint8Array.from(atob(audio), c => c.charCodeAt(0));
     const audioBlob = new Blob([binaryAudio], { type: "audio/webm" });
 
-    // 建立 FormData
     const formData = new FormData();
     formData.append("file", audioBlob, "audio.webm");
     formData.append("model", "whisper-1");
     formData.append("language", language === "zh-TW" ? "zh" : language === "en-US" ? "en" : "zh");
     formData.append("response_format", "json");
     
-    // 添加 prompt 來減少幻覺
-    formData.append("prompt", "這是一段會議對話的語音記錄，請準確轉錄實際說話的內容。如果沒有人說話，請返回空白。");
+    // 英文 prompt（較不會被回顯），設定為會議對話情境
+    formData.append("prompt", "This is a meeting conversation recording. Transcribe only the actual spoken words. If there is silence, return empty.");
 
-    console.log("📤 呼叫 OpenAI Whisper API...");
-
-    // 呼叫 OpenAI Whisper API
     const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openaiKey}`,
-      },
+      headers: { "Authorization": `Bearer ${openaiKey}` },
       body: formData,
     });
 
     const result = await response.json();
-    console.log("📥 Whisper 回應:", response.status);
 
     if (!response.ok) {
-      console.error("❌ Whisper 錯誤:", JSON.stringify(result));
-      return new Response(JSON.stringify({ error: result.error?.message || "Whisper API error" }), {
+      return new Response(JSON.stringify({ error: result.error?.message }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    // 過濾掉可能的幻覺內容
-    let transcript = result.text || "";
+    let transcript = (result.text || "").trim();
     
-    // 如果結果看起來像是幻覺（包含特定模式），則忽略
-    const hallucinations = [
-      "youtube", "subscribe", "點讚", "訂閱", "轉發", "打賞", "支持",
-      "www.", ".com", "http", "感謝收看", "感謝觀看", "下期見"
-    ];
-    
-    const isHallucination = hallucinations.some(h => 
-      transcript.toLowerCase().includes(h.toLowerCase())
-    );
-    
-    if (isHallucination) {
-      console.log("⚠️ 檢測到幻覺內容，忽略:", transcript);
+    // 只過濾太短的結果
+    if (transcript.length < 2) {
       transcript = "";
     }
 
-    console.log("✅ 轉錄結果:", transcript);
+    console.log("結果:", transcript || "(空)");
 
     return new Response(JSON.stringify({ transcript, success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
 
   } catch (e) {
-    console.error("❌ 錯誤:", e);
+    console.error("錯誤:", e);
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
@@ -131,6 +97,8 @@ serve(async (req) => {
 ```
 
 **變更**：
-1. 加入 prompt 引導 Whisper
-2. 過濾常見幻覺關鍵字
-3. 忽略過短的音訊
+- 使用**英文 prompt**（較不會被中文音訊回顯）
+- 移除所有硬編碼過濾
+- 只用 Whisper 自己的判斷
+
+請更新後測試！如果還是有問題，可能真的需要考慮本地 Whisper 或其他方案。
