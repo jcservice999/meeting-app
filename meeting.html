@@ -10,8 +10,8 @@
 
     <!-- Supabase SDK -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <!-- Daily.co SDK -->
-    <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
+    <!-- PeerJS SDK -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 
 <body>
@@ -85,11 +85,13 @@
         let participantsChannel = null;
         let captionsChannel = null;
 
-        // Daily.co 語音通話
-        let dailyCallObject = null;
+        // PeerJS 語音通話
+        let peer = null;
+        let localStream = null;
+        let peerConnections = new Map(); // peerId -> call
         let isMicOn = true;
         let isSpeakerOn = true;
-        const DAILY_ROOM_URL = 'https://inzqsdelrwxxlbcumaiw.supabase.co/functions/v1/daily-room';
+        let voiceChannel = null;
 
         // 檢查房間存取權限
         async function checkRoomAccess() {
@@ -849,12 +851,23 @@
                 if (participantsChannel) participantsChannel.unsubscribe();
                 if (captionsChannel) captionsChannel.unsubscribe();
 
-                // 斷開 Daily.co 語音
-                if (dailyCallObject) {
-                    await dailyCallObject.leave();
-                    dailyCallObject.destroy();
-                    dailyCallObject = null;
+                // 斷開 PeerJS 語音
+                if (peer) {
+                    peerConnections.forEach(call => call.close());
+                    peerConnections.clear();
+                    peer.destroy();
+                    peer = null;
                 }
+                if (localStream) {
+                    localStream.getTracks().forEach(track => track.stop());
+                    localStream = null;
+                }
+                if (voiceChannel) {
+                    voiceChannel.unsubscribe();
+                    voiceChannel = null;
+                }
+                // 移除所有遠端音訊元素
+                document.querySelectorAll('audio[id^="audio-"]').forEach(el => el.remove());
 
                 console.log('✅ 已離開會議');
             } catch (error) {
@@ -919,73 +932,108 @@
 
         console.log('=== 會議室初始化完成 ===');
 
-        // ========== Daily.co 語音通話 ==========
-        async function initDailyVoice() {
+        // ========== PeerJS 語音通話 ==========
+        async function initPeerVoice() {
             try {
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (!session) return;
+                // 取得麥克風權限
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                console.log('✅ 取得麥克風權限');
 
-                const userName = currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || 'Guest';
-
-                // 取得 Daily.co 房間 Token
-                const response = await fetch(DAILY_ROOM_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${session.access_token}`
-                    },
-                    body: JSON.stringify({
-                        roomName: MEETING_ID,
-                        userName: userName
-                    })
+                // 建立 PeerJS 連接（使用公共伺服器）
+                const peerId = `${MEETING_ID}-${currentUser.id.substring(0, 8)}`;
+                peer = new Peer(peerId, {
+                    debug: 1
                 });
 
-                const result = await response.json();
-                if (result.error) {
-                    console.error('Daily.co 錯誤:', result.error);
-                    return;
-                }
-
-                console.log('✅ Daily.co 房間取得成功');
-
-                // 建立 Daily Call
-                dailyCallObject = DailyIframe.createCallObject({
-                    audioSource: true,
-                    videoSource: false,
-                    dailyConfig: {
-                        experimentalChromeVideoMuteLightOff: true
-                    }
+                peer.on('open', (id) => {
+                    console.log('✅ PeerJS 連接成功, ID:', id);
+                    // 廣播自己的 peerId 給其他人
+                    broadcastPeerId(id);
+                    // 訂閱其他人的 peerId
+                    subscribeToVoice();
                 });
 
-                // 監聽參與者加入，確保音訊播放
-                dailyCallObject.on('participant-joined', (event) => {
-                    console.log('🔊 參與者加入:', event.participant.user_name);
+                peer.on('call', (call) => {
+                    console.log('📞 收到來電:', call.peer);
+                    // 自動接聽
+                    call.answer(localStream);
+                    handleCall(call);
                 });
 
-                dailyCallObject.on('participant-left', (event) => {
-                    console.log('👋 參與者離開:', event.participant.user_name);
+                peer.on('error', (err) => {
+                    console.error('PeerJS 錯誤:', err);
                 });
 
-                // 監聽音軌更新
-                dailyCallObject.on('track-started', (event) => {
-                    if (event.track.kind === 'audio' && event.participant && !event.participant.local) {
-                        console.log('🎵 收到遠端音訊:', event.participant.user_name);
-                    }
-                });
-
-                // 加入房間
-                await dailyCallObject.join({
-                    url: result.roomUrl,
-                    token: result.token,
-                    subscribeToTracksAutomatically: true
-                });
-
-                console.log('✅ 已連接 Daily.co 語音通話');
                 updateVoiceButtons();
 
             } catch (error) {
-                console.error('Daily.co 初始化失敗:', error);
+                console.error('PeerJS 初始化失敗:', error);
+                alert('無法取得麥克風權限');
             }
+        }
+
+        // 處理通話連接
+        function handleCall(call) {
+            call.on('stream', (remoteStream) => {
+                console.log('🎵 收到遠端音訊:', call.peer);
+                playRemoteAudio(remoteStream, call.peer);
+            });
+
+            call.on('close', () => {
+                console.log('📴 通話結束:', call.peer);
+                removeRemoteAudio(call.peer);
+                peerConnections.delete(call.peer);
+            });
+
+            peerConnections.set(call.peer, call);
+        }
+
+        // 播放遠端音訊
+        function playRemoteAudio(stream, peerId) {
+            let audio = document.getElementById(`audio-${peerId}`);
+            if (!audio) {
+                audio = document.createElement('audio');
+                audio.id = `audio-${peerId}`;
+                audio.autoplay = true;
+                audio.style.display = 'none';
+                document.body.appendChild(audio);
+            }
+            audio.srcObject = stream;
+            audio.muted = !isSpeakerOn;
+        }
+
+        // 移除遠端音訊
+        function removeRemoteAudio(peerId) {
+            const audio = document.getElementById(`audio-${peerId}`);
+            if (audio) audio.remove();
+        }
+
+        // 廣播自己的 peerId
+        async function broadcastPeerId(peerId) {
+            voiceChannel = supabaseClient.channel(`voice-${MEETING_ID}`);
+
+            voiceChannel.on('broadcast', { event: 'peer-join' }, async (payload) => {
+                const remotePeerId = payload.payload.peerId;
+                if (remotePeerId !== peerId && !peerConnections.has(remotePeerId)) {
+                    console.log('📞 撥打給:', remotePeerId);
+                    const call = peer.call(remotePeerId, localStream);
+                    handleCall(call);
+                }
+            });
+
+            await voiceChannel.subscribe();
+
+            // 廣播自己加入
+            voiceChannel.send({
+                type: 'broadcast',
+                event: 'peer-join',
+                payload: { peerId }
+            });
+        }
+
+        // 訂閱語音頻道
+        function subscribeToVoice() {
+            // 已在 broadcastPeerId 中處理
         }
 
         function updateVoiceButtons() {
@@ -1001,38 +1049,31 @@
 
         // 麥克風開關
         document.getElementById('micBtn').addEventListener('click', () => {
-            if (!dailyCallObject) {
+            if (!localStream) {
                 alert('語音通話尚未連接');
                 return;
             }
             isMicOn = !isMicOn;
-            dailyCallObject.setLocalAudio(isMicOn);
+            localStream.getAudioTracks().forEach(track => track.enabled = isMicOn);
             updateVoiceButtons();
             console.log('麥克風:', isMicOn ? '開啟' : '關閉');
         });
 
-        // 嗇叭開關
+        // 喇叭開關
         document.getElementById('speakerBtn').addEventListener('click', () => {
-            if (!dailyCallObject) {
-                alert('語音通話尚未連接');
-                return;
-            }
             isSpeakerOn = !isSpeakerOn;
-            // Daily.co 使用 setLocalAudio 來控制接收音訊
-            const participants = dailyCallObject.participants();
-            Object.keys(participants).forEach(id => {
-                if (id !== 'local') {
-                    dailyCallObject.updateParticipant(id, { setAudio: isSpeakerOn });
-                }
+            // 控制所有遠端音訊的靜音
+            document.querySelectorAll('audio[id^="audio-"]').forEach(audio => {
+                audio.muted = !isSpeakerOn;
             });
             updateVoiceButtons();
-            console.log('嗇叭:', isSpeakerOn ? '開啟' : '關閉');
+            console.log('喇叭:', isSpeakerOn ? '開啟' : '關閉');
         });
 
         // 進入會議室後自動連接語音
         setTimeout(() => {
             if (currentUser) {
-                initDailyVoice();
+                initPeerVoice();
             }
         }, 2000);
     </script>
