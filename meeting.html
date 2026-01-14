@@ -951,13 +951,33 @@
                 // 建立 Daily Call
                 dailyCallObject = DailyIframe.createCallObject({
                     audioSource: true,
-                    videoSource: false
+                    videoSource: false,
+                    dailyConfig: {
+                        experimentalChromeVideoMuteLightOff: true
+                    }
+                });
+
+                // 監聽參與者加入，確保音訊播放
+                dailyCallObject.on('participant-joined', (event) => {
+                    console.log('🔊 參與者加入:', event.participant.user_name);
+                });
+
+                dailyCallObject.on('participant-left', (event) => {
+                    console.log('👋 參與者離開:', event.participant.user_name);
+                });
+
+                // 監聽音軌更新
+                dailyCallObject.on('track-started', (event) => {
+                    if (event.track.kind === 'audio' && event.participant && !event.participant.local) {
+                        console.log('🎵 收到遠端音訊:', event.participant.user_name);
+                    }
                 });
 
                 // 加入房間
                 await dailyCallObject.join({
                     url: result.roomUrl,
-                    token: result.token
+                    token: result.token,
+                    subscribeToTracksAutomatically: true
                 });
 
                 console.log('✅ 已連接 Daily.co 語音通話');
