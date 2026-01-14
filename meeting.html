@@ -310,12 +310,59 @@
             }
         }
 
-        // 錄音循環 - 每 3 秒處理一次
+        // VAD 設定
+        const VAD_THRESHOLD = 15;  // 音量閾值，可調整 (0-255)
+        let vadMaxVolume = 0;      // 錄音期間的最大音量
+        let vadAnalyser = null;    // VAD 專用的分析器
+        let vadInterval = null;    // VAD 檢測定時器
+
+        // 開始 VAD 監測
+        function startVADMonitoring(stream) {
+            const vadContext = new (window.AudioContext || window.webkitAudioContext)();
+            vadAnalyser = vadContext.createAnalyser();
+            vadAnalyser.fftSize = 256;
+            vadAnalyser.smoothingTimeConstant = 0.3;
+
+            const source = vadContext.createMediaStreamSource(stream);
+            source.connect(vadAnalyser);
+
+            // 每 100ms 檢測一次音量
+            vadInterval = setInterval(() => {
+                if (!vadAnalyser) return;
+                const dataArray = new Uint8Array(vadAnalyser.frequencyBinCount);
+                vadAnalyser.getByteFrequencyData(dataArray);
+                const avg = dataArray.reduce((sum, val) => sum + val, 0) / dataArray.length;
+                if (avg > vadMaxVolume) {
+                    vadMaxVolume = avg;
+                }
+            }, 100);
+
+            console.log('✅ VAD 監測已啟動');
+        }
+
+        // 停止 VAD 監測
+        function stopVADMonitoring() {
+            if (vadInterval) {
+                clearInterval(vadInterval);
+                vadInterval = null;
+            }
+            vadAnalyser = null;
+        }
+
+        // 錄音循環 - 每 6 秒處理一次
         function startRecordingLoop() {
             const language = document.getElementById('languageSelect').value;
 
+            // 啟動 VAD 監測
+            if (audioStream) {
+                startVADMonitoring(audioStream);
+            }
+
             function recordChunk() {
                 if (!audioStream) return;
+
+                // 重置這一輪的最大音量
+                vadMaxVolume = 0;
 
                 audioChunks = [];
                 mediaRecorder = new MediaRecorder(audioStream, {
@@ -330,6 +377,16 @@
 
                 mediaRecorder.onstop = async () => {
                     if (audioChunks.length === 0) return;
+
+                    // VAD 檢查：如果音量太低，跳過送給 Whisper
+                    const maxVol = vadMaxVolume;
+                    console.log(`🔊 這段錄音的最大音量: ${maxVol.toFixed(1)} (閾值: ${VAD_THRESHOLD})`);
+
+                    if (maxVol < VAD_THRESHOLD) {
+                        console.log('⏭️ 音量過低，跳過此段（避免幻覺）');
+                        showInterimCaption('正在聆聽...');
+                        return;
+                    }
 
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
 
@@ -411,6 +468,9 @@
 
         // 停止 Google Speech 錄音
         function stopDeepgramStream() {
+            // 停止 VAD 監測
+            stopVADMonitoring();
+
             if (recordingInterval) {
                 clearInterval(recordingInterval);
                 recordingInterval = null;
