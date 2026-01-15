@@ -12,6 +12,40 @@
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <!-- PeerJS SDK -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <style>
+        .audio-unlock-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .audio-unlock-content {
+            text-align: center;
+            color: white;
+            padding: 40px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .audio-unlock-content h2 {
+            margin: 20px 0 10px;
+            font-size: 24px;
+        }
+
+        .audio-unlock-content p {
+            margin-bottom: 24px;
+            opacity: 0.8;
+        }
+    </style>
 </head>
 
 <body>
@@ -40,6 +74,18 @@
                 <!-- 動態生成 -->
             </div>
         </main>
+
+        <!-- 音訊解鎖提示（解決瀏覽器 autoplay 政策） -->
+        <div id="audioUnlockOverlay" class="audio-unlock-overlay" style="display: none;">
+            <div class="audio-unlock-content">
+                <span style="font-size: 48px;">🔊</span>
+                <h2>點擊啟用語音通話</h2>
+                <p>瀏覽器需要您的互動才能播放音訊</p>
+                <button id="unlockAudioBtn" class="btn-primary" style="font-size: 18px; padding: 12px 32px;">
+                    點擊啟用
+                </button>
+            </div>
+        </div>
 
         <!-- 字幕條 - 固定在底部 -->
         <div id="captionContainer" class="caption-container">
@@ -1102,23 +1148,53 @@
             console.log('喇叭:', isSpeakerOn ? '開啟' : '關閉');
         });
 
-        // 提示詞設定
-        document.getElementById('promptBtn').addEventListener('click', () => {
-            const currentPrompt = localStorage.getItem('whisperPrompt') || 'This is a meeting conversation. Transcribe the spoken words accurately.';
-            const newPrompt = prompt('設定 Whisper 提示詞（可改善辨識準確度）：\n\n範例：\n• JBS商學院的會議錄音\n• 軟體開發技術討論\n• 商業會議，包含產品名稱和術語', currentPrompt);
+        // 音訊解鎖功能
+        let audioUnlocked = false;
 
-            if (newPrompt !== null) {
-                whisperPrompt = newPrompt;
-                localStorage.setItem('whisperPrompt', newPrompt);
-                console.log('✅ 提示詞已更新:', newPrompt);
-                alert('提示詞已儲存！');
+        function showAudioUnlockPrompt() {
+            if (audioUnlocked) return;
+            const overlay = document.getElementById('audioUnlockOverlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
             }
-        });
+        }
+
+        function unlockAudio() {
+            audioUnlocked = true;
+            const overlay = document.getElementById('audioUnlockOverlay');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
+
+            // 嘗試播放所有現有的音訊元素
+            document.querySelectorAll('audio[id^="audio-"]').forEach(audio => {
+                audio.play().then(() => {
+                    console.log('🔊 音訊已解鎖並播放');
+                }).catch(e => console.error('播放失敗:', e));
+            });
+
+            console.log('✅ 音訊已解鎖');
+        }
+
+        // 綁定解鎖按鈕
+        const unlockBtn = document.getElementById('unlockAudioBtn');
+        if (unlockBtn) {
+            unlockBtn.addEventListener('click', unlockAudio);
+        }
+
+        // 任何使用者互動都解鎖音訊
+        document.addEventListener('click', () => {
+            if (!audioUnlocked) {
+                unlockAudio();
+            }
+        }, { once: true });
 
         // 進入會議室後自動連接語音
         setTimeout(() => {
             if (currentUser) {
                 initPeerVoice();
+                // 顯示解鎖提示
+                showAudioUnlockPrompt();
             }
         }, 2000);
     </script>
