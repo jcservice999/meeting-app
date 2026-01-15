@@ -390,9 +390,10 @@
         function startAudioStreaming() {
             if (!audioStream || !assemblySocket) return;
 
-            assemblyAudioContext = new (window.AudioContext || window.webkitAudioContext)({
-                sampleRate: 16000
-            });
+            // 使用原生採樣率（通常 44100 或 48000）
+            assemblyAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const nativeSampleRate = assemblyAudioContext.sampleRate;
+            console.log('原生採樣率:', nativeSampleRate);
 
             const source = assemblyAudioContext.createMediaStreamSource(audioStream);
             const processor = assemblyAudioContext.createScriptProcessor(4096, 1, 1);
@@ -404,18 +405,29 @@
                 if (assemblySocket && assemblySocket.readyState === WebSocket.OPEN) {
                     const inputData = event.inputBuffer.getChannelData(0);
 
-                    // 轉換為 16-bit PCM
-                    const pcmData = new Int16Array(inputData.length);
-                    for (let i = 0; i < inputData.length; i++) {
-                        pcmData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+                    // 重新採樣到 16kHz
+                    const targetSampleRate = 16000;
+                    const ratio = nativeSampleRate / targetSampleRate;
+                    const newLength = Math.floor(inputData.length / ratio);
+                    const resampledData = new Float32Array(newLength);
+
+                    for (let i = 0; i < newLength; i++) {
+                        resampledData[i] = inputData[Math.floor(i * ratio)];
                     }
 
-                    // v3 API: 直接傳送 raw binary audio (不是 JSON)
+                    // 轉換為 16-bit PCM
+                    const pcmData = new Int16Array(resampledData.length);
+                    for (let i = 0; i < resampledData.length; i++) {
+                        pcmData[i] = Math.max(-32768, Math.min(32767, resampledData[i] * 32768));
+                    }
+
+                    // v3 API: 直接傳送 raw binary audio
                     assemblySocket.send(pcmData.buffer);
                 }
             };
 
             audioWorklet = processor;
+            console.log('🎙️ 音訊串流已開始');
         }
 
         // VAD 設定
