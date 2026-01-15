@@ -326,14 +326,15 @@
                 }
 
                 const language = document.getElementById('languageSelect').value;
-                const langCode = language === 'zh-TW' ? 'zh' : 'en';
+                // 選擇模型：英文用 english，其他用 multi
+                const speechModel = language === 'en-US' ? 'universal-streaming-english' : 'universal-streaming-multi';
 
-                // 建立 WebSocket 連接
-                const wsUrl = `wss://api.assemblyai.com/v2/realtime/ws?sample_rate=16000&token=${tokenData.token}&language_code=${langCode}`;
+                // 建立 WebSocket 連接（新的 v3 Universal Streaming API）
+                const wsUrl = `wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&token=${tokenData.token}&speech_model=${speechModel}&format_turns=true`;
                 assemblySocket = new WebSocket(wsUrl);
 
                 assemblySocket.onopen = () => {
-                    console.log('✅ AssemblyAI Streaming 已連接');
+                    console.log('✅ AssemblyAI Universal Streaming 已連接');
                     showInterimCaption('正在聆聽...');
                     startAudioStreaming();
                 };
@@ -341,13 +342,22 @@
                 assemblySocket.onmessage = (event) => {
                     const data = JSON.parse(event.data);
 
-                    if (data.message_type === 'FinalTranscript' && data.text) {
-                        console.log('✅ 最終轉錄:', data.text);
-                        showLocalCaption(data.text);
-                        saveCaption(data.text);
-                    } else if (data.message_type === 'PartialTranscript' && data.text) {
-                        console.log('⏳ 即時轉錄:', data.text);
-                        showInterimCaption(data.text);
+                    // 新的 v3 API 訊息格式
+                    if (data.type === 'Turn' && data.transcript) {
+                        if (data.end_of_turn) {
+                            console.log('✅ 完整句子:', data.transcript);
+                            showLocalCaption(data.transcript);
+                            saveCaption(data.transcript);
+                        } else {
+                            console.log('⏳ 即時轉錄:', data.transcript);
+                            showInterimCaption(data.transcript);
+                        }
+                    } else if (data.type === 'Begin') {
+                        console.log('📍 Session 開始:', data.id);
+                    } else if (data.type === 'Termination') {
+                        console.log('📍 Session 結束');
+                    } else if (data.type === 'Error') {
+                        console.error('❌ AssemblyAI 錯誤:', data.message);
                     }
                 };
 
@@ -357,7 +367,7 @@
 
                 assemblySocket.onclose = (event) => {
                     console.log('🔌 WebSocket 已關閉:', event.code, event.reason);
-                    if (event.code === 4001) {
+                    if (event.code === 4001 || event.code === 4000) {
                         alert('AssemblyAI 認證失敗，請檢查 API Key');
                     }
                 };
