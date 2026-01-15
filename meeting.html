@@ -410,9 +410,8 @@
                         pcmData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
                     }
 
-                    // Base64 編碼並傳送
-                    const base64 = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
-                    assemblySocket.send(JSON.stringify({ audio_data: base64 }));
+                    // v3 API: 直接傳送 raw binary audio (不是 JSON)
+                    assemblySocket.send(pcmData.buffer);
                 }
             };
 
