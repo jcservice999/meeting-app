@@ -539,6 +539,8 @@
 
         async function initPeerVoice() {
             try {
+                console.log('📱 開始初始化 PeerJS...');
+
                 // 取得麥克風權限
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                 console.log('✅ 取得麥克風權限');
@@ -550,10 +552,19 @@
                 isMicOn = false;
                 console.log('🔇 麥克風預設關閉，按「開始錄音」才會開啟');
 
-                // 建立 PeerJS 連接（使用公共伺服器）
+                // 建立 PeerJS 連接（加入 STUN 伺服器以改善手機連接）
                 const peerId = `${MEETING_ID}-${currentUser.id.substring(0, 8)}`;
                 peer = new Peer(peerId, {
-                    debug: 1
+                    debug: 2,  // 提高除錯等級
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' },
+                            { urls: 'stun:stun3.l.google.com:19302' },
+                            { urls: 'stun:stun4.l.google.com:19302' }
+                        ]
+                    }
                 });
 
                 peer.on('open', (id) => {
@@ -563,18 +574,26 @@
 
                 peer.on('call', (call) => {
                     console.log('📞 收到來電:', call.peer);
+                    console.log('📞 本地音訊軌道數:', localStream.getAudioTracks().length);
                     call.answer(localStream);
                     handleCall(call);
                 });
 
                 peer.on('error', (err) => {
-                    console.error('PeerJS 錯誤:', err);
+                    console.error('❌ PeerJS 錯誤:', err.type, err);
+                    alert('語音連線錯誤: ' + err.type);
+                });
+
+                peer.on('disconnected', () => {
+                    console.warn('⚠️ PeerJS 連線中斷，嘗試重連...');
+                    peer.reconnect();
                 });
 
                 updateVoiceButtons();
 
             } catch (error) {
-                console.error('PeerJS 初始化失敗:', error);
+                console.error('❌ PeerJS 初始化失敗:', error);
+                alert('語音初始化失敗: ' + error.message);
             }
         }
 
