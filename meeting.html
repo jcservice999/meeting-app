@@ -328,9 +328,9 @@
                 const language = document.getElementById('languageSelect').value;
                 console.log('選擇語言:', language);
 
-                // 建立 WebSocket 連接（v3 Universal Streaming API - 使用最基本參數）
-                const wsUrl = `wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&token=${tokenData.token}`;
-                console.log('WebSocket URL:', wsUrl.substring(0, 60) + '...');
+                // 建立 WebSocket 連接（v3 Universal Streaming API）
+                const wsUrl = `wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&encoding=pcm_s16le&token=${tokenData.token}`;
+                console.log('WebSocket URL:', wsUrl.substring(0, 80) + '...');
                 assemblySocket = new WebSocket(wsUrl);
 
                 assemblySocket.onopen = () => {
