@@ -384,8 +384,8 @@
                             const responseTime = Date.now();
                             const elapsed = responseTime - requestTime;
 
-                            // 忽略超過 8 秒的過期結果
-                            if (elapsed > 8000) {
+                            // 忽略超過 20 秒的過期結果
+                            if (elapsed > 20000) {
                                 console.log(`⏭️ 忽略過期結果 (${(elapsed / 1000).toFixed(1)}秒前的請求)`);
                                 return;
                             }
@@ -418,11 +418,11 @@
                     if (mediaRecorder && mediaRecorder.state === 'recording') {
                         mediaRecorder.stop();
                     }
-                }, 2000);  // 2 秒錄音
+                }, 5000);  // 5 秒錄音，確保辨識品質
             }
 
             recordChunk();
-            recordingInterval = setInterval(recordChunk, 2500);  // 2.5 秒循環
+            recordingInterval = setInterval(recordChunk, 6000);  // 6 秒循環
         }
 
         // VAD 設定
@@ -561,11 +561,23 @@
             audio.srcObject = stream;
             audio.muted = !isSpeakerOn;
 
-            audio.play().then(() => {
-                console.log('🔊 音訊播放成功:', peerId);
-            }).catch(err => {
-                console.error('❌ 音訊播放失敗:', err);
-            });
+            // 嘗試播放，如果被阻擋則等待使用者互動
+            const tryPlay = () => {
+                audio.play().then(() => {
+                    console.log('🔊 音訊播放成功:', peerId);
+                }).catch(err => {
+                    console.warn('⚠️ 音訊播放被阻擋，等待使用者互動:', err.name);
+                    // 在任何使用者互動時嘗試播放
+                    const resumeAudio = () => {
+                        audio.play().catch(e => console.error('重試播放失敗:', e));
+                        document.removeEventListener('click', resumeAudio);
+                        document.removeEventListener('keydown', resumeAudio);
+                    };
+                    document.addEventListener('click', resumeAudio, { once: true });
+                    document.addEventListener('keydown', resumeAudio, { once: true });
+                });
+            };
+            tryPlay();
         }
 
         function removeRemoteAudio(peerId) {
