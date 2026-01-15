@@ -600,29 +600,41 @@
                 audio.id = `audio-${peerId}`;
                 audio.autoplay = true;
                 audio.playsInline = true;
+                audio.setAttribute('playsinline', '');  // iOS 需要
+                audio.setAttribute('webkit-playsinline', '');  // 舊版 iOS
                 audio.style.display = 'none';
                 document.body.appendChild(audio);
             }
             audio.srcObject = stream;
             audio.muted = !isSpeakerOn;
+            audio.volume = 1.0;  // 確保音量最大
 
-            // 嘗試播放，如果被阻擋則等待使用者互動
+            // 手機+電腦通用的播放嘗試
             const tryPlay = () => {
-                audio.play().then(() => {
-                    console.log('🔊 音訊播放成功:', peerId);
-                }).catch(err => {
-                    console.warn('⚠️ 音訊播放被阻擋，等待使用者互動:', err.name);
-                    // 在任何使用者互動時嘗試播放
-                    const resumeAudio = () => {
-                        audio.play().catch(e => console.error('重試播放失敗:', e));
-                        document.removeEventListener('click', resumeAudio);
-                        document.removeEventListener('keydown', resumeAudio);
-                    };
-                    document.addEventListener('click', resumeAudio, { once: true });
-                    document.addEventListener('keydown', resumeAudio, { once: true });
-                });
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('🔊 音訊播放成功:', peerId);
+                    }).catch(err => {
+                        console.warn('⚠️ 音訊播放被阻擋:', err.name);
+                        // 註冊多種互動事件
+                        const resumeAudio = () => {
+                            audio.muted = false;
+                            audio.volume = 1.0;
+                            audio.play().then(() => {
+                                console.log('🔊 重試播放成功');
+                            }).catch(e => console.error('重試播放失敗:', e));
+                        };
+                        // 手機需要 touchstart/touchend
+                        ['click', 'touchstart', 'touchend', 'keydown'].forEach(event => {
+                            document.addEventListener(event, resumeAudio, { once: true });
+                        });
+                    });
+                }
             };
-            tryPlay();
+
+            // 延遲播放（某些手機需要）
+            setTimeout(tryPlay, 100);
         }
 
         function removeRemoteAudio(peerId) {
@@ -1180,14 +1192,17 @@
         const unlockBtn = document.getElementById('unlockAudioBtn');
         if (unlockBtn) {
             unlockBtn.addEventListener('click', unlockAudio);
+            unlockBtn.addEventListener('touchend', unlockAudio);  // 手機觸控
         }
 
-        // 任何使用者互動都解鎖音訊
-        document.addEventListener('click', () => {
-            if (!audioUnlocked) {
-                unlockAudio();
-            }
-        }, { once: true });
+        // 任何使用者互動都解鎖音訊（包括手機觸控）
+        ['click', 'touchstart', 'touchend'].forEach(event => {
+            document.addEventListener(event, () => {
+                if (!audioUnlocked) {
+                    unlockAudio();
+                }
+            }, { once: true });
+        });
 
         // 進入會議室後自動連接語音
         setTimeout(() => {
