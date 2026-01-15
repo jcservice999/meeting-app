@@ -326,7 +326,11 @@
             }
 
             function recordChunk() {
-                if (!audioStream) return;
+                console.log('🎙️ 開始錄製音訊片段...');
+                if (!audioStream) {
+                    console.error('❌ 沒有音訊串流！');
+                    return;
+                }
 
                 // 重置這一輪的最大音量
                 vadMaxVolume = 0;
