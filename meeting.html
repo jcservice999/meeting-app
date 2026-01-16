@@ -322,15 +322,15 @@
 
 
 
-        // AssemblyAI API 語音轉錄設定
-        const SPEECH_API_URL = 'https://inzqsdelrwxxlbcumaiw.supabase.co/functions/v1/assemblyai-speech';
+        // 本地 Whisper 語音轉錄設定
+        const SPEECH_API_URL = 'http://127.0.0.1:5000/transcribe';
 
         let mediaRecorder = null;
         let audioStream = null;
         let recordingInterval = null;
         let audioChunks = [];
 
-        // 開始 AssemblyAI Batch 錄音
+        // 開始本地 Whisper 錄音
         async function startDeepgramStream() {
             try {
                 // 取得麥克風權限
@@ -342,7 +342,7 @@
                     }
                 });
 
-                console.log('✅ AssemblyAI Batch 語音轉錄已啟動');
+                console.log('✅ 本地 Whisper 語音轉錄已啟動');
                 showInterimCaption('正在聆聽...');
 
                 // 開始錄音循環
@@ -352,9 +352,8 @@
 
             } catch (error) {
                 console.error('語音辨識初始化失敗:', error);
-                if (error.message.includes('No active')) {
-                    alert('請先在「AssemblyAI API 設定」中新增 API Key');
-                    window.location.href = 'settings.html';
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    alert('無法連接本地 Whisper 伺服器，請確認伺服器已啟動 (python server.py)');
                 } else {
                     alert('語音辨識初始化失敗：' + error.message);
                 }
@@ -414,19 +413,18 @@
                             const { data: { session } } = await supabaseClient.auth.getSession();
                             if (!session) return;
 
-                            console.log('📤 傳送音訊到 AssemblyAI...');
+                            console.log('📤 傳送音訊到本地 Whisper...');
                             const requestTime = Date.now();
 
                             const response = await fetch(SPEECH_API_URL, {
                                 method: 'POST',
                                 headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${session.access_token}`
+                                    'Content-Type': 'application/json'
                                 },
                                 body: JSON.stringify({
                                     audio: base64Audio,
                                     language: language,
-                                    roomId: MEETING_ID
+                                    prompt: '這是商業會議的錄音。'  // 可自訂提示詞
                                 })
                             });
 
@@ -437,10 +435,9 @@
 
                             if (result.error) {
                                 console.error('❌ 辨識錯誤:', result.error);
-                                if (result.error.includes('No active') || result.error.includes('exhausted')) {
+                                if (result.error.includes('模型') || result.error.includes('伺服器')) {
                                     stopDeepgramStream();
-                                    alert('API Key 已用盡或無效');
-                                    window.location.href = 'settings.html';
+                                    alert('Whisper 伺服器錯誤：' + result.error);
                                 }
                                 return;
                             }
@@ -525,7 +522,7 @@
                 audioStream.getTracks().forEach(track => track.stop());
                 audioStream = null;
             }
-            console.log('⏹️ AssemblyAI 已停止');
+            console.log('⏹️ Whisper 已停止');
         }
 
 
@@ -1095,7 +1092,7 @@
             if (!isRecording) {
                 const speakerOK = await initSpeakerDetection();
                 if (speakerOK) {
-                    // 使用 AssemblyAI 語音辨識
+                    // 使用本地 Whisper 語音辨識
                     const deepgramOK = await startDeepgramStream();
                     if (deepgramOK) {
                         isRecording = true;
@@ -1112,7 +1109,7 @@
                             console.log('🎙️ 麥克風已開啟');
                         }
 
-                        console.log('🎤 開始錄音 (AssemblyAI)');
+                        console.log('🎤 開始錄音 (Whisper)');
                     }
                 }
 
