@@ -334,13 +334,13 @@
         let audioStream = null;
         let audioChunks = [];
 
-        // VAD 連續錄音設定（穩定識別版）
-        const SILENCE_THRESHOLD = 20;     // 閾值調回 20（避免 30 把語音誤判為靜音）
-        const SILENCE_DURATION = 2500;    // 停頓 2.5 秒才切（錄長一點標點才準）
-        const MIN_AUDIO_DURATION = 3000;  // 最短錄滿 3 秒
-        const MAX_AUDIO_DURATION = 40000; // 最長可達 40 秒
-        const MAX_CONCURRENT_REQUESTS = 1;
-        const MIN_AUDIO_SIZE = 5000;
+        // VAD 連續錄音設定（即時轉錄版）
+        const SILENCE_THRESHOLD = 20;     // 語音門檻
+        const SILENCE_DURATION = 800;     // 停頓 0.8 秒即可切（搭配 LLM 補標點）
+        const MIN_AUDIO_DURATION = 2000;  // 最短錄滿 2 秒
+        const MAX_AUDIO_DURATION = 5000;  // 最長 5 秒即分段（即時性最高）
+        const MAX_CONCURRENT_REQUESTS = 2; // 開放更多並行，因頻率變快
+        const MIN_AUDIO_SIZE = 3000;      // 對應短音訊調低體積限制
 
         let vadContext = null;
         let vadAnalyser = null;
