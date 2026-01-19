@@ -334,11 +334,11 @@
         let audioStream = null;
         let audioChunks = [];
 
-        // VAD 連續錄音設定（減少截斷版）
-        const SILENCE_THRESHOLD = 3;      // 降低靜音閾值（更敏感）
-        const SILENCE_DURATION = 2000;    // 靜音 2 秒後才切割
-        const MIN_AUDIO_DURATION = 2000;  // 最短 2 秒
-        const MAX_AUDIO_DURATION = 15000; // 最長 15 秒（拉長）
+        // VAD 連續錄音設定（智慧斷句版）
+        const SILENCE_THRESHOLD = 3;      // 靜音閾值（越低越敏感）
+        const SILENCE_DURATION = 1500;    // 靜音 1.5 秒後切割（一般講話停頓）
+        const MIN_AUDIO_DURATION = 1500;  // 最短 1.5 秒
+        const MAX_AUDIO_DURATION = 30000; // 最長 30 秒（減少強制切割）
         const MAX_CONCURRENT_REQUESTS = 1; // 1 個請求
         const MIN_AUDIO_SIZE = 10000;     // 最小音訊大小 10KB
 
