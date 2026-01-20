@@ -123,10 +123,14 @@
         let recognition = null;
         let isRecording = false;
         let isSpeaking = false;
-        let audioContext = null; // 全域變數
-        let audioStream = null;  // 全域變數
-        let processor = null;    // 全域變數
-        let socket = null;       // 全域變數
+
+        // --- 語音轉錄全域變數 ---
+        let audioContext = null;
+        let audioStream = null;
+        let processor = null;
+        let socket = null;
+        // ----------------------
+
         let participants = new Map();
         let participantsChannel = null;
         let captionsChannel = null;
@@ -324,9 +328,8 @@
 
 
         // AssemblyAI Streaming 設定
+        // 注意：這裡改用 token 取得函數
         const TOKEN_API_URL = 'https://inzqsdelrwxxlbcumaiw.supabase.co/functions/v1/assemblyai-token';
-
-        // socket, processor, audioStream, audioContext 已在上方全域聲明
 
         // 開始 AssemblyAI Streaming
         async function startAssemblyAIStreaming() {
@@ -346,17 +349,18 @@
 
                 const tokenData = await tokenResponse.json();
                 if (!tokenData.success) throw new Error(tokenData.error || "無法取得 Token");
-                console.log('🎫 取得 Token 成功 (前8位):', tokenData.token.substring(0, 8));
 
-                // 2. 建立 WebSocket
-                const language = document.getElementById('languageSelect').value;
+                console.log('🎫 取得 Token 成功');
+
+                // 2. 建立 WebSocket (改用 v2 穩定版)
                 const sampleRate = 16000;
-                const url = `wss://streaming.assemblyai.com/v3/realtime?sample_rate=${sampleRate}&token=${tokenData.token}`;
+                const v2Url = `wss://api.assemblyai.com/v2/realtime/ws?sample_rate=${sampleRate}&token=${tokenData.token}`;
 
-                socket = new WebSocket(url);
+                console.log('📡 正在連接 AssemblyAI v2...');
+                socket = new WebSocket(v2Url);
 
                 socket.onopen = async () => {
-                    console.log('✅ AssemblyAI WebSocket 已連接 (v3)');
+                    console.log('✅ AssemblyAI WebSocket 已連接 (v2)');
                     await startAudioCapture(sampleRate);
                     showInterimCaption('正在聆聽 (即時串流)...');
                 };
@@ -371,19 +375,21 @@
                         saveCaption(data.text);
                     } else if (data.message_type === 'SessionBegins') {
                         console.log('🚀 Session ID:', data.session_id);
+                    } else if (data.error) {
+                        console.error('❌ AssemblyAI 回傳錯誤:', data.error);
                     }
                 };
 
                 socket.onerror = (error) => {
-                    console.error('❌ WebSocket 連接異常:', error);
+                    console.error('❌ WebSocket 連接異常');
                 };
 
                 socket.onclose = (event) => {
                     console.log('⏹️ WebSocket 已關閉', event.code, event.reason);
-                    if (event.code !== 1000 && isRecording) {
-                        console.warn('⚠️ WebSocket 非正常關閉，請檢查 API Key 或權限');
+                    if (isRecording) {
+                        stopAssemblyAIStreaming();
+                        stopRecording();
                     }
-                    stopAssemblyAIStreaming();
                 };
 
                 return true;
