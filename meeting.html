@@ -260,7 +260,10 @@
                     filter: `meeting_id=eq.${MEETING_ID}`
                 }, (payload) => {
                     console.log('新字幕:', payload.new);
-                    displayRemoteCaption(payload.new);
+                    // ✅ 修正：如果是自己發送的字幕，忽略不顯示（因為本地已經顯示過）
+                    if (payload.new.user_id !== currentUser.id) {
+                        displayRemoteCaption(payload.new);
+                    }
                 })
                 .subscribe();
         }
@@ -358,39 +361,57 @@
 
             } catch (error) {
                 console.error('語音辨識初始化失敗:', error);
-                alert('語音辨識初始化失敗：' + error.message);
-                return false;
-            }
-        }
+                // 錄音循環 - 無縫錄音版
+                function startRecordingLoop(stream) {
+                    const language = document.getElementById('languageSelect').value;
 
-        // 錄音循環 - 每 6 秒處理一次
-        function startRecordingLoop(stream) {
-            const language = document.getElementById('languageSelect').value;
+                    function recordNextChunk() {
+                        if (!isRecording) return;
 
-            function recordChunk() {
-                if (!isRecording) return;
+                        // console.log('🎙️ 開始錄製下一段...'); // 減少 Log 避免刷屏
+                        audioChunks = [];
 
-                console.log('🎙️ 開始錄製 Batch 片段...');
-                audioChunks = [];
+                        try {
+                            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+                        } catch (e) {
+                            mediaRecorder = new MediaRecorder(stream);
+                        }
 
-                try {
-                    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-                } catch (e) {
-                    // Fallback for Safari/others
-                    mediaRecorder = new MediaRecorder(stream);
+                        mediaRecorder.ondataavailable = (event) => {
+                            if (event.data.size > 0) audioChunks.push(event.data);
+                        };
+
+                        mediaRecorder.onstop = async () => {
+                            // ⚠️ 關鍵：一停止馬上開始下一段，把空窗期縮到最小
+                            if (isRecording) {
+                                recordNextChunk();
+                            }
+
+                            if (audioChunks.length === 0) return;
+
+                            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                            if (audioBlob.size < 1000) return;
+
+                            // 非同步上傳，不阻擋錄音
+                            processAudioChunk(audioBlob, language);
+                        };
+
+                        mediaRecorder.start();
+
+                        // 5秒後停止這一段 -> 觸發 onstop -> 立即開始下一段
+                        setTimeout(() => {
+                            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                                mediaRecorder.stop();
+                            }
+                        }, 5000);
+                    }
+
+                    // 啟動第一次
+                    recordNextChunk();
                 }
 
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) audioChunks.push(event.data);
-                };
-
-                mediaRecorder.onstop = async () => {
-                    if (audioChunks.length === 0) return;
-
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    if (audioBlob.size < 1000) return; // 跳過太小的片段
-
-                    console.log(`📦 準備上傳片段 (${audioBlob.size} bytes)...`);
+                async function processAudioChunk(audioBlob, language) {
+                    // console.log(`📦 上傳片段 (${audioBlob.size} bytes)...`);
                     const reader = new FileReader();
                     reader.onloadend = async () => {
                         const base64Audio = reader.result.split(',')[1];
@@ -398,7 +419,6 @@
                             const { data: { session } } = await supabaseClient.auth.getSession();
                             if (!session) return;
 
-                            // 發送請求
                             const response = await fetch(SPEECH_API_URL, {
                                 method: 'POST',
                                 headers: {
@@ -414,7 +434,7 @@
 
                             const result = await response.json();
                             if (result.transcript && result.transcript.trim()) {
-                                console.log('✅ Batch 辨識結果:', result.transcript);
+                                console.log('✅ 辨識:', result.transcript);
                                 showLocalCaption(result.transcript);
                                 saveCaption(result.transcript);
                             }
@@ -423,730 +443,716 @@
                         }
                     };
                     reader.readAsDataURL(audioBlob);
-                };
+                }
 
-                mediaRecorder.start();
-
-                // 5秒後停止這一段
-                setTimeout(() => {
-                    if (mediaRecorder && mediaRecorder.state === 'recording') {
+                function stopAssemblyAIBatch() {
+                    console.log('⏹️ 停止 AssemblyAI (Batch)...');
+                    // recordingInterval 已經不再需要了，因為改成遞歸調用
+                    if (recordingInterval) {
+                        clearInterval(recordingInterval);
+                        recordingInterval = null;
+                    }
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                         mediaRecorder.stop();
                     }
-                }, 5000);
-            }
-
-            // 立即開始第一段，然後每 6 秒一次
-            recordChunk();
-            recordingInterval = setInterval(recordChunk, 6000);
-        }
-
-        function stopAssemblyAIBatch() {
-            console.log('⏹️ 停止 AssemblyAI (Batch)...');
-            if (recordingInterval) {
-                clearInterval(recordingInterval);
-                recordingInterval = null;
-            }
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-            }
-            // 這裡不關閉 stream，因為可能是共用的 localStream
-            console.log('✅ Batch 錄音已停止');
-        }
+                    // 這裡不關閉 stream，因為可能是共用的 localStream
+                    console.log('✅ Batch 錄音已停止');
+                }
 
 
-        // ========== PeerJS 語音通話 ==========
-        let peer = null;
-        let localStream = null;
-        let voiceChannel = null;
-        let peerConnections = new Map();
-        let isMicOn = true;
-        let isSpeakerOn = true;
+                // ========== PeerJS 語音通話 ==========
+                let peer = null;
+                let localStream = null;
+                let voiceChannel = null;
+                let peerConnections = new Map();
+                let isMicOn = true;
+                let isSpeakerOn = true;
 
-        async function initPeerVoice() {
-            try {
-                console.log('📱 開始初始化 PeerJS...');
+                async function initPeerVoice() {
+                    try {
+                        console.log('📱 開始初始化 PeerJS...');
 
-                // 取得麥克風權限
-                localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                console.log('✅ 取得麥克風權限');
+                        // 取得麥克風權限
+                        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                        console.log('✅ 取得麥克風權限');
 
-                // ⚠️ 預設關閉麥克風，等使用者按「開始錄音」才開啟
-                localStream.getAudioTracks().forEach(track => {
-                    track.enabled = false;
-                });
-                isMicOn = false;
-                console.log('🔇 麥克風預設關閉，按「開始錄音」才會開啟');
-
-                // 建立 PeerJS 連接（加入 STUN 伺服器以改善手機連接）
-                const peerId = `${MEETING_ID}-${currentUser.id.substring(0, 8)}`;
-                peer = new Peer(peerId, {
-                    debug: 2,  // 提高除錯等級
-                    config: {
-                        iceServers: [
-                            { urls: 'stun:stun.l.google.com:19302' },
-                            { urls: 'stun:stun1.l.google.com:19302' },
-                            { urls: 'stun:stun2.l.google.com:19302' },
-                            { urls: 'stun:stun3.l.google.com:19302' },
-                            { urls: 'stun:stun4.l.google.com:19302' }
-                        ]
-                    }
-                });
-
-                peer.on('open', (id) => {
-                    console.log('✅ PeerJS 連接成功, ID:', id);
-                    broadcastPeerId(id);
-                });
-
-                peer.on('call', (call) => {
-                    console.log('📞 收到來電:', call.peer);
-                    console.log('📞 本地音訊軌道數:', localStream.getAudioTracks().length);
-                    call.answer(localStream);
-                    handleCall(call);
-                });
-
-                peer.on('error', (err) => {
-                    console.error('❌ PeerJS 錯誤:', err.type, err);
-                    alert('語音連線錯誤: ' + err.type);
-                });
-
-                peer.on('disconnected', () => {
-                    console.warn('⚠️ PeerJS 連線中斷，嘗試重連...');
-                    peer.reconnect();
-                });
-
-                updateVoiceButtons();
-
-            } catch (error) {
-                console.error('❌ PeerJS 初始化失敗:', error);
-                alert('語音初始化失敗: ' + error.message);
-            }
-        }
-
-        function handleCall(call) {
-            call.on('stream', (remoteStream) => {
-                console.log('🎵 收到遠端音訊:', call.peer);
-                playRemoteAudio(remoteStream, call.peer);
-            });
-
-            call.on('close', () => {
-                console.log('📴 通話結束:', call.peer);
-                removeRemoteAudio(call.peer);
-                peerConnections.delete(call.peer);
-            });
-
-            peerConnections.set(call.peer, call);
-        }
-
-        function playRemoteAudio(stream, peerId) {
-            let audio = document.getElementById(`audio-${peerId}`);
-            if (!audio) {
-                audio = document.createElement('audio');
-                audio.id = `audio-${peerId}`;
-                audio.autoplay = true;
-                audio.playsInline = true;
-                audio.setAttribute('playsinline', '');  // iOS 需要
-                audio.setAttribute('webkit-playsinline', '');  // 舊版 iOS
-                audio.style.display = 'none';
-                document.body.appendChild(audio);
-            }
-            audio.srcObject = stream;
-            audio.muted = !isSpeakerOn;
-            audio.volume = 1.0;  // 確保音量最大
-
-            // 手機+電腦通用的播放嘗試
-            const tryPlay = () => {
-                const playPromise = audio.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        console.log('🔊 音訊播放成功:', peerId);
-                    }).catch(err => {
-                        console.warn('⚠️ 音訊播放被阻擋:', err.name);
-                        // 註冊多種互動事件
-                        const resumeAudio = () => {
-                            audio.muted = false;
-                            audio.volume = 1.0;
-                            audio.play().then(() => {
-                                console.log('🔊 重試播放成功');
-                            }).catch(e => console.error('重試播放失敗:', e));
-                        };
-                        // 手機需要 touchstart/touchend
-                        ['click', 'touchstart', 'touchend', 'keydown'].forEach(event => {
-                            document.addEventListener(event, resumeAudio, { once: true });
+                        // ⚠️ 預設關閉麥克風，等使用者按「開始錄音」才開啟
+                        localStream.getAudioTracks().forEach(track => {
+                            track.enabled = false;
                         });
+                        isMicOn = false;
+                        console.log('🔇 麥克風預設關閉，按「開始錄音」才會開啟');
+
+                        // 建立 PeerJS 連接（加入 STUN 伺服器以改善手機連接）
+                        const peerId = `${MEETING_ID}-${currentUser.id.substring(0, 8)}`;
+                        peer = new Peer(peerId, {
+                            debug: 2,  // 提高除錯等級
+                            config: {
+                                iceServers: [
+                                    { urls: 'stun:stun.l.google.com:19302' },
+                                    { urls: 'stun:stun1.l.google.com:19302' },
+                                    { urls: 'stun:stun2.l.google.com:19302' },
+                                    { urls: 'stun:stun3.l.google.com:19302' },
+                                    { urls: 'stun:stun4.l.google.com:19302' }
+                                ]
+                            }
+                        });
+
+                        peer.on('open', (id) => {
+                            console.log('✅ PeerJS 連接成功, ID:', id);
+                            broadcastPeerId(id);
+                        });
+
+                        peer.on('call', (call) => {
+                            console.log('📞 收到來電:', call.peer);
+                            console.log('📞 本地音訊軌道數:', localStream.getAudioTracks().length);
+                            call.answer(localStream);
+                            handleCall(call);
+                        });
+
+                        peer.on('error', (err) => {
+                            console.error('❌ PeerJS 錯誤:', err.type, err);
+                            alert('語音連線錯誤: ' + err.type);
+                        });
+
+                        peer.on('disconnected', () => {
+                            console.warn('⚠️ PeerJS 連線中斷，嘗試重連...');
+                            peer.reconnect();
+                        });
+
+                        updateVoiceButtons();
+
+                    } catch (error) {
+                        console.error('❌ PeerJS 初始化失敗:', error);
+                        alert('語音初始化失敗: ' + error.message);
+                    }
+                }
+
+                function handleCall(call) {
+                    call.on('stream', (remoteStream) => {
+                        console.log('🎵 收到遠端音訊:', call.peer);
+                        playRemoteAudio(remoteStream, call.peer);
+                    });
+
+                    call.on('close', () => {
+                        console.log('📴 通話結束:', call.peer);
+                        removeRemoteAudio(call.peer);
+                        peerConnections.delete(call.peer);
+                    });
+
+                    peerConnections.set(call.peer, call);
+                }
+
+                function playRemoteAudio(stream, peerId) {
+                    let audio = document.getElementById(`audio-${peerId}`);
+                    if (!audio) {
+                        audio = document.createElement('audio');
+                        audio.id = `audio-${peerId}`;
+                        audio.autoplay = true;
+                        audio.playsInline = true;
+                        audio.setAttribute('playsinline', '');  // iOS 需要
+                        audio.setAttribute('webkit-playsinline', '');  // 舊版 iOS
+                        audio.style.display = 'none';
+                        document.body.appendChild(audio);
+                    }
+                    audio.srcObject = stream;
+                    audio.muted = !isSpeakerOn;
+                    audio.volume = 1.0;  // 確保音量最大
+
+                    // 手機+電腦通用的播放嘗試
+                    const tryPlay = () => {
+                        const playPromise = audio.play();
+                        if (playPromise !== undefined) {
+                            playPromise.then(() => {
+                                console.log('🔊 音訊播放成功:', peerId);
+                            }).catch(err => {
+                                console.warn('⚠️ 音訊播放被阻擋:', err.name);
+                                // 註冊多種互動事件
+                                const resumeAudio = () => {
+                                    audio.muted = false;
+                                    audio.volume = 1.0;
+                                    audio.play().then(() => {
+                                        console.log('🔊 重試播放成功');
+                                    }).catch(e => console.error('重試播放失敗:', e));
+                                };
+                                // 手機需要 touchstart/touchend
+                                ['click', 'touchstart', 'touchend', 'keydown'].forEach(event => {
+                                    document.addEventListener(event, resumeAudio, { once: true });
+                                });
+                            });
+                        }
+                    };
+
+                    // 延遲播放（某些手機需要）
+                    setTimeout(tryPlay, 100);
+                }
+
+                function removeRemoteAudio(peerId) {
+                    const audio = document.getElementById(`audio-${peerId}`);
+                    if (audio) audio.remove();
+                }
+
+                async function broadcastPeerId(peerId) {
+                    voiceChannel = supabaseClient.channel(`voice-${MEETING_ID}`);
+
+                    voiceChannel.on('broadcast', { event: 'peer-join' }, async (payload) => {
+                        const remotePeerId = payload.payload.peerId;
+                        if (remotePeerId !== peerId && !peerConnections.has(remotePeerId)) {
+                            console.log('📞 撥打給:', remotePeerId);
+                            const call = peer.call(remotePeerId, localStream);
+                            handleCall(call);
+                        }
+                    });
+
+                    await voiceChannel.subscribe();
+
+                    voiceChannel.send({
+                        type: 'broadcast',
+                        event: 'peer-join',
+                        payload: { peerId }
                     });
                 }
-            };
 
-            // 延遲播放（某些手機需要）
-            setTimeout(tryPlay, 100);
-        }
+                function updateVoiceButtons() {
+                    const micBtn = document.getElementById('micBtn');
+                    const speakerBtn = document.getElementById('speakerBtn');
 
-        function removeRemoteAudio(peerId) {
-            const audio = document.getElementById(`audio-${peerId}`);
-            if (audio) audio.remove();
-        }
-
-        async function broadcastPeerId(peerId) {
-            voiceChannel = supabaseClient.channel(`voice-${MEETING_ID}`);
-
-            voiceChannel.on('broadcast', { event: 'peer-join' }, async (payload) => {
-                const remotePeerId = payload.payload.peerId;
-                if (remotePeerId !== peerId && !peerConnections.has(remotePeerId)) {
-                    console.log('📞 撥打給:', remotePeerId);
-                    const call = peer.call(remotePeerId, localStream);
-                    handleCall(call);
-                }
-            });
-
-            await voiceChannel.subscribe();
-
-            voiceChannel.send({
-                type: 'broadcast',
-                event: 'peer-join',
-                payload: { peerId }
-            });
-        }
-
-        function updateVoiceButtons() {
-            const micBtn = document.getElementById('micBtn');
-            const speakerBtn = document.getElementById('speakerBtn');
-
-            if (micBtn) {
-                micBtn.textContent = isMicOn ? '🎙️' : '🔇';
-                micBtn.style.opacity = isMicOn ? '1' : '0.5';
-            }
-            if (speakerBtn) {
-                speakerBtn.textContent = isSpeakerOn ? '🔊' : '🔈';
-                speakerBtn.style.opacity = isSpeakerOn ? '1' : '0.5';
-            }
-        }
-
-        function toggleMic() {
-            isMicOn = !isMicOn;
-            if (localStream) {
-                localStream.getAudioTracks().forEach(track => {
-                    track.enabled = isMicOn;
-                });
-            }
-            updateVoiceButtons();
-            console.log('🎙️ 麥克風:', isMicOn ? '開啟' : '關閉');
-        }
-
-        function toggleSpeaker() {
-            isSpeakerOn = !isSpeakerOn;
-            document.querySelectorAll('audio[id^="audio-"]').forEach(audio => {
-                audio.muted = !isSpeakerOn;
-            });
-            updateVoiceButtons();
-            console.log('🔊 喇叭:', isSpeakerOn ? '開啟' : '關閉');
-        }
-
-        function initSpeechRecognition() {
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                alert('您的瀏覽器不支援語音識別功能。請使用 Chrome 或 Edge 瀏覽器。');
-                return;
-            }
-
-            const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognition = new SpeechRecognitionAPI();
-
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.maxAlternatives = 3;
-            recognition.lang = 'zh-TW';
-
-            let finalTranscriptBuffer = '';
-            let lastFinalTime = Date.now();
-
-            recognition.onresult = (event) => {
-                let interimTranscript = '';
-                let finalTranscript = '';
-
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        finalTranscript += transcript;
-                    } else {
-                        interimTranscript += transcript;
+                    if (micBtn) {
+                        micBtn.textContent = isMicOn ? '🎙️' : '🔇';
+                        micBtn.style.opacity = isMicOn ? '1' : '0.5';
+                    }
+                    if (speakerBtn) {
+                        speakerBtn.textContent = isSpeakerOn ? '🔊' : '🔈';
+                        speakerBtn.style.opacity = isSpeakerOn ? '1' : '0.5';
                     }
                 }
 
-                if (interimTranscript) {
-                    showInterimCaption(interimTranscript);
-                }
-
-                if (finalTranscript) {
-                    finalTranscriptBuffer += finalTranscript + ' ';
-                    lastFinalTime = Date.now();
-
-                    // 立即顯示本地字幕（不等資料庫）
-                    showLocalCaption(finalTranscript);
-
-                    // 減少延遲，更快儲存
-                    setTimeout(() => {
-                        if (Date.now() - lastFinalTime >= 500 && finalTranscriptBuffer.trim()) {
-                            saveCaption(finalTranscriptBuffer.trim());
-                            finalTranscriptBuffer = '';
-                        }
-                    }, 600);
-                }
-            };
-
-            let isRestarting = false;
-
-            recognition.onerror = (event) => {
-                console.error('語音識別錯誤:', event.error);
-
-                // 嚴重錯誤，停止錄音
-                if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                    alert('無法存取麥克風，請檢查權限設定');
-                    stopRecording();
-                    return;
-                }
-
-                // 可恢復的錯誤，嘗試重啟
-                if ((event.error === 'no-speech' || event.error === 'aborted' || event.error === 'network') && isRecording && !isRestarting) {
-                    isRestarting = true;
-                    setTimeout(() => {
-                        if (isRecording) {
-                            try {
-                                recognition.start();
-                            } catch (e) {
-                                console.error('重啟失敗:', e);
-                            }
-                        }
-                        isRestarting = false;
-                    }, 300);
-                }
-            };
-
-            recognition.onend = () => {
-                console.log('語音識別結束');
-                if (isRecording && !isRestarting) {
-                    isRestarting = true;
-                    setTimeout(() => {
-                        if (isRecording) {
-                            try {
-                                recognition.start();
-                            } catch (e) {
-                                console.error('重啟失敗:', e);
-                            }
-                        }
-                        isRestarting = false;
-                    }, 300);
-                }
-            };
-
-            console.log('✅ 語音識別已初始化');
-        }
-
-        // 初始化說話者檢測
-        async function initSpeakerDetection() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
+                function toggleMic() {
+                    isMicOn = !isMicOn;
+                    if (localStream) {
+                        localStream.getAudioTracks().forEach(track => {
+                            track.enabled = isMicOn;
+                        });
                     }
-                });
-
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 512;
-                analyser.smoothingTimeConstant = 0.8;
-
-                const microphone = audioContext.createMediaStreamSource(stream);
-                microphone.connect(analyser);
-
-                detectSpeaking();
-                console.log('✅ 說話者檢測已初始化');
-                return true;
-            } catch (error) {
-                console.error('無法存取麥克風:', error);
-                return false;
-            }
-        }
-
-        // 檢測說話
-        function detectSpeaking() {
-            if (!analyser) return;
-
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            analyser.getByteFrequencyData(dataArray);
-            const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
-
-            const speaking = average > 25;
-            if (speaking !== isSpeaking) {
-                isSpeaking = speaking;
-                updateSpeakingStatus(speaking);
-            }
-
-            animationId = requestAnimationFrame(detectSpeaking);
-        }
-
-        // 更新說話狀態
-        async function updateSpeakingStatus(speaking) {
-            const card = document.getElementById(`participant-${currentUser.id}`);
-            if (card) {
-                if (speaking) {
-                    card.classList.add('speaking');
-                } else {
-                    card.classList.remove('speaking');
+                    updateVoiceButtons();
+                    console.log('🎙️ 麥克風:', isMicOn ? '開啟' : '關閉');
                 }
-            }
 
-            // 更新資料庫
-            try {
-                await supabaseClient
-                    .from('participants')
-                    .update({ is_speaking: speaking })
-                    .eq('meeting_id', MEETING_ID)
-                    .eq('user_id', currentUser.id);
-            } catch (error) {
-                console.error('更新說話狀態失敗:', error);
-            }
-        }
+                function toggleSpeaker() {
+                    isSpeakerOn = !isSpeakerOn;
+                    document.querySelectorAll('audio[id^="audio-"]').forEach(audio => {
+                        audio.muted = !isSpeakerOn;
+                    });
+                    updateVoiceButtons();
+                    console.log('🔊 喇叭:', isSpeakerOn ? '開啟' : '關閉');
+                }
 
-        // 顯示即時字幕（本地）
-        function showInterimCaption(text) {
-            const captionBar = document.getElementById('captionBar');
-            // 使用 user_id 來區分不同使用者的即時字幕
-            const interimId = `interim-${currentUser.id}`;
-            let interimEl = captionBar.querySelector(`#${interimId}`);
+                function initSpeechRecognition() {
+                    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                        alert('您的瀏覽器不支援語音識別功能。請使用 Chrome 或 Edge 瀏覽器。');
+                        return;
+                    }
 
-            if (!interimEl) {
-                interimEl = document.createElement('div');
-                interimEl.id = interimId;
-                interimEl.className = 'caption-item interim-caption';
-                interimEl.style.opacity = '0.5';
-                captionBar.appendChild(interimEl);
-            }
+                    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    recognition = new SpeechRecognitionAPI();
 
-            const userName = currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || '我';
-            interimEl.innerHTML = `
+                    recognition.continuous = true;
+                    recognition.interimResults = true;
+                    recognition.maxAlternatives = 3;
+                    recognition.lang = 'zh-TW';
+
+                    let finalTranscriptBuffer = '';
+                    let lastFinalTime = Date.now();
+
+                    recognition.onresult = (event) => {
+                        let interimTranscript = '';
+                        let finalTranscript = '';
+
+                        for (let i = event.resultIndex; i < event.results.length; i++) {
+                            const transcript = event.results[i][0].transcript;
+                            if (event.results[i].isFinal) {
+                                finalTranscript += transcript;
+                            } else {
+                                interimTranscript += transcript;
+                            }
+                        }
+
+                        if (interimTranscript) {
+                            showInterimCaption(interimTranscript);
+                        }
+
+                        if (finalTranscript) {
+                            finalTranscriptBuffer += finalTranscript + ' ';
+                            lastFinalTime = Date.now();
+
+                            // 立即顯示本地字幕（不等資料庫）
+                            showLocalCaption(finalTranscript);
+
+                            // 減少延遲，更快儲存
+                            setTimeout(() => {
+                                if (Date.now() - lastFinalTime >= 500 && finalTranscriptBuffer.trim()) {
+                                    saveCaption(finalTranscriptBuffer.trim());
+                                    finalTranscriptBuffer = '';
+                                }
+                            }, 600);
+                        }
+                    };
+
+                    let isRestarting = false;
+
+                    recognition.onerror = (event) => {
+                        console.error('語音識別錯誤:', event.error);
+
+                        // 嚴重錯誤，停止錄音
+                        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                            alert('無法存取麥克風，請檢查權限設定');
+                            stopRecording();
+                            return;
+                        }
+
+                        // 可恢復的錯誤，嘗試重啟
+                        if ((event.error === 'no-speech' || event.error === 'aborted' || event.error === 'network') && isRecording && !isRestarting) {
+                            isRestarting = true;
+                            setTimeout(() => {
+                                if (isRecording) {
+                                    try {
+                                        recognition.start();
+                                    } catch (e) {
+                                        console.error('重啟失敗:', e);
+                                    }
+                                }
+                                isRestarting = false;
+                            }, 300);
+                        }
+                    };
+
+                    recognition.onend = () => {
+                        console.log('語音識別結束');
+                        if (isRecording && !isRestarting) {
+                            isRestarting = true;
+                            setTimeout(() => {
+                                if (isRecording) {
+                                    try {
+                                        recognition.start();
+                                    } catch (e) {
+                                        console.error('重啟失敗:', e);
+                                    }
+                                }
+                                isRestarting = false;
+                            }, 300);
+                        }
+                    };
+
+                    console.log('✅ 語音識別已初始化');
+                }
+
+                // 初始化說話者檢測
+                async function initSpeakerDetection() {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({
+                            audio: {
+                                echoCancellation: true,
+                                noiseSuppression: true,
+                                autoGainControl: true
+                            }
+                        });
+
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        analyser = audioContext.createAnalyser();
+                        analyser.fftSize = 512;
+                        analyser.smoothingTimeConstant = 0.8;
+
+                        const microphone = audioContext.createMediaStreamSource(stream);
+                        microphone.connect(analyser);
+
+                        detectSpeaking();
+                        console.log('✅ 說話者檢測已初始化');
+                        return true;
+                    } catch (error) {
+                        console.error('無法存取麥克風:', error);
+                        return false;
+                    }
+                }
+
+                // 檢測說話
+                function detectSpeaking() {
+                    if (!analyser) return;
+
+                    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteFrequencyData(dataArray);
+                    const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
+
+                    const speaking = average > 25;
+                    if (speaking !== isSpeaking) {
+                        isSpeaking = speaking;
+                        updateSpeakingStatus(speaking);
+                    }
+
+                    animationId = requestAnimationFrame(detectSpeaking);
+                }
+
+                // 更新說話狀態
+                async function updateSpeakingStatus(speaking) {
+                    const card = document.getElementById(`participant-${currentUser.id}`);
+                    if (card) {
+                        if (speaking) {
+                            card.classList.add('speaking');
+                        } else {
+                            card.classList.remove('speaking');
+                        }
+                    }
+
+                    // 更新資料庫
+                    try {
+                        await supabaseClient
+                            .from('participants')
+                            .update({ is_speaking: speaking })
+                            .eq('meeting_id', MEETING_ID)
+                            .eq('user_id', currentUser.id);
+                    } catch (error) {
+                        console.error('更新說話狀態失敗:', error);
+                    }
+                }
+
+                // 顯示即時字幕（本地）
+                function showInterimCaption(text) {
+                    const captionBar = document.getElementById('captionBar');
+                    // 使用 user_id 來區分不同使用者的即時字幕
+                    const interimId = `interim-${currentUser.id}`;
+                    let interimEl = captionBar.querySelector(`#${interimId}`);
+
+                    if (!interimEl) {
+                        interimEl = document.createElement('div');
+                        interimEl.id = interimId;
+                        interimEl.className = 'caption-item interim-caption';
+                        interimEl.style.opacity = '0.5';
+                        captionBar.appendChild(interimEl);
+                    }
+
+                    const userName = currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || '我';
+                    interimEl.innerHTML = `
                 <span class="caption-speaker">${userName}:</span>
                 <span class="caption-text">${escapeHtml(text)}</span>
             `;
 
-            captionBar.scrollTop = captionBar.scrollHeight;
-        }
+                    captionBar.scrollTop = captionBar.scrollHeight;
+                }
 
-        // 立即顯示本地確定字幕（不等資料庫）
-        function showLocalCaption(text) {
-            const captionBar = document.getElementById('captionBar');
-            const captionFull = document.getElementById('captionFull');
+                // 立即顯示本地確定字幕（不等資料庫）
+                function showLocalCaption(text) {
+                    const captionBar = document.getElementById('captionBar');
+                    const captionFull = document.getElementById('captionFull');
 
-            // 移除即時字幕
-            const interimId = `interim-${currentUser.id}`;
-            const interimEl = captionBar.querySelector(`#${interimId}`);
-            if (interimEl) interimEl.remove();
+                    // 移除即時字幕
+                    const interimId = `interim-${currentUser.id}`;
+                    const interimEl = captionBar.querySelector(`#${interimId}`);
+                    if (interimEl) interimEl.remove();
 
-            const userName = currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || '我';
-            const now = new Date().toLocaleTimeString('zh-TW');
+                    const userName = currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || '我';
+                    const now = new Date().toLocaleTimeString('zh-TW');
 
-            // 字幕條：只保留最近 3 行
-            const captionItem = document.createElement('div');
-            captionItem.className = 'caption-item';
-            captionItem.style.opacity = '0.7';
-            captionItem.innerHTML = `
+                    // 字幕條：只保留最近 3 行
+                    const captionItem = document.createElement('div');
+                    captionItem.className = 'caption-item';
+                    captionItem.style.opacity = '0.7';
+                    captionItem.innerHTML = `
                 <span class="caption-speaker">${userName}:</span>
                 <span class="caption-text">${escapeHtml(text)}</span>
             `;
-            captionBar.appendChild(captionItem);
+                    captionBar.appendChild(captionItem);
 
-            // 只保留最近 3 行
-            const items = captionBar.querySelectorAll('.caption-item:not(.interim-caption)');
-            if (items.length > 3) {
-                for (let i = 0; i < items.length - 3; i++) {
-                    items[i].remove();
-                }
-            }
+                    // 只保留最近 3 行
+                    const items = captionBar.querySelectorAll('.caption-item:not(.interim-caption)');
+                    if (items.length > 3) {
+                        for (let i = 0; i < items.length - 3; i++) {
+                            items[i].remove();
+                        }
+                    }
 
-            // 完整字幕：保留所有
-            const captionFullItem = document.createElement('div');
-            captionFullItem.className = 'caption-item-full';
-            captionFullItem.style.opacity = '0.7';
-            captionFullItem.innerHTML = `
+                    // 完整字幕：保留所有
+                    const captionFullItem = document.createElement('div');
+                    captionFullItem.className = 'caption-item-full';
+                    captionFullItem.style.opacity = '0.7';
+                    captionFullItem.innerHTML = `
                 <div class="caption-header">
                     <span class="caption-speaker">${userName}</span>
                     <span class="caption-time">${now}</span>
                 </div>
                 <div class="caption-text">${escapeHtml(text)}</div>
             `;
-            captionFull.appendChild(captionFullItem);
+                    captionFull.appendChild(captionFullItem);
 
-            captionBar.scrollTop = captionBar.scrollHeight;
-            captionFull.scrollTop = captionFull.scrollHeight;
-        }
+                    captionBar.scrollTop = captionBar.scrollHeight;
+                    captionFull.scrollTop = captionFull.scrollHeight;
+                }
 
-        // 儲存字幕到資料庫（背景執行，不阻塞）
-        async function saveCaption(text) {
-            try {
-                // 非同步儲存，不等待結果
-                supabaseClient
-                    .from('captions')
-                    .insert({
-                        meeting_id: MEETING_ID,
-                        user_id: currentUser.id,
-                        user_name: currentUser.user_metadata?.full_name || currentUser.email.split('@')[0],
-                        text: text,
-                        language: document.getElementById('languageSelect').value
-                    })
-                    .then(({ error }) => {
-                        if (error) console.error('儲存字幕失敗:', error);
-                        else console.log('✅ 字幕已儲存');
-                    });
-            } catch (error) {
-                console.error('儲存字幕失敗:', error);
-            }
-        }
+                // 儲存字幕到資料庫（背景執行，不阻塞）
+                async function saveCaption(text) {
+                    try {
+                        // 非同步儲存，不等待結果
+                        supabaseClient
+                            .from('captions')
+                            .insert({
+                                meeting_id: MEETING_ID,
+                                user_id: currentUser.id,
+                                user_name: currentUser.user_metadata?.full_name || currentUser.email.split('@')[0],
+                                text: text,
+                                language: document.getElementById('languageSelect').value
+                            })
+                            .then(({ error }) => {
+                                if (error) console.error('儲存字幕失敗:', error);
+                                else console.log('✅ 字幕已儲存');
+                            });
+                    } catch (error) {
+                        console.error('儲存字幕失敗:', error);
+                    }
+                }
 
-        // 顯示遠端字幕
-        function displayRemoteCaption(caption) {
-            const captionBar = document.getElementById('captionBar');
-            const captionFull = document.getElementById('captionFull');
+                // 顯示遠端字幕
+                function displayRemoteCaption(caption) {
+                    const captionBar = document.getElementById('captionBar');
+                    const captionFull = document.getElementById('captionFull');
 
-            // 移除對應使用者的即時字幕
-            const interimId = `interim-${caption.user_id}`;
-            const interimEl = captionBar.querySelector(`#${interimId}`);
-            if (interimEl) interimEl.remove();
+                    // 移除對應使用者的即時字幕
+                    const interimId = `interim-${caption.user_id}`;
+                    const interimEl = captionBar.querySelector(`#${interimId}`);
+                    if (interimEl) interimEl.remove();
 
-            const now = new Date(caption.created_at).toLocaleTimeString('zh-TW');
+                    const now = new Date(caption.created_at).toLocaleTimeString('zh-TW');
 
-            // 字幕條：只保留最近 3 行
-            const captionItem = document.createElement('div');
-            captionItem.className = 'caption-item';
-            captionItem.innerHTML = `
+                    // 字幕條：只保留最近 3 行
+                    const captionItem = document.createElement('div');
+                    captionItem.className = 'caption-item';
+                    captionItem.innerHTML = `
                 <span class="caption-speaker">${caption.user_name}:</span>
                 <span class="caption-text">${escapeHtml(caption.text)}</span>
             `;
-            captionBar.appendChild(captionItem);
+                    captionBar.appendChild(captionItem);
 
-            // 只保留最近 3 行
-            const items = captionBar.querySelectorAll('.caption-item:not(.interim-caption)');
-            if (items.length > 3) {
-                for (let i = 0; i < items.length - 3; i++) {
-                    items[i].remove();
-                }
-            }
+                    // 只保留最近 3 行
+                    const items = captionBar.querySelectorAll('.caption-item:not(.interim-caption)');
+                    if (items.length > 3) {
+                        for (let i = 0; i < items.length - 3; i++) {
+                            items[i].remove();
+                        }
+                    }
 
-            // 完整字幕：保留所有
-            const captionFullItem = document.createElement('div');
-            captionFullItem.className = 'caption-item-full';
-            captionFullItem.innerHTML = `
+                    // 完整字幕：保留所有
+                    const captionFullItem = document.createElement('div');
+                    captionFullItem.className = 'caption-item-full';
+                    captionFullItem.innerHTML = `
                 <div class="caption-header">
                     <span class="caption-speaker">${caption.user_name}</span>
                     <span class="caption-time">${now}</span>
                 </div>
                 <div class="caption-text">${escapeHtml(caption.text)}</div>
             `;
-            captionFull.appendChild(captionFullItem);
+                    captionFull.appendChild(captionFullItem);
 
-            captionBar.scrollTop = captionBar.scrollHeight;
-            captionFull.scrollTop = captionFull.scrollHeight;
-        }
-
-        // HTML 轉義
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // 停止錄音
-        function stopRecording() {
-            if (recognition) {
-                try {
-                    recognition.stop();
-                } catch (e) {
-                    console.error('停止語音識別失敗:', e);
+                    captionBar.scrollTop = captionBar.scrollHeight;
+                    captionFull.scrollTop = captionFull.scrollHeight;
                 }
-            }
-            if (animationId) cancelAnimationFrame(animationId);
-            if (audioContext) {
-                try {
-                    audioContext.close();
-                } catch (e) {
-                    console.error('關閉音訊上下文失敗:', e);
+
+                // HTML 轉義
+                function escapeHtml(text) {
+                    const div = document.createElement('div');
+                    div.textContent = text;
+                    return div.innerHTML;
                 }
-            }
-            isRecording = false;
-            isSpeaking = false;
-            updateSpeakingStatus(false);
-            document.getElementById('startBtn').textContent = '開始錄音';
-            document.getElementById('startBtn').classList.remove('btn-danger');
-            document.getElementById('startBtn').classList.add('btn-primary');
-        }
 
-        // 離開會議
-        async function leaveMeeting() {
-            try {
-                await supabaseClient
-                    .from('participants')
-                    .delete()
-                    .eq('meeting_id', MEETING_ID)
-                    .eq('user_id', currentUser.id);
-
-                if (participantsChannel) participantsChannel.unsubscribe();
-                if (captionsChannel) captionsChannel.unsubscribe();
-
-                // 斷開 PeerJS 語音
-                if (peer) {
-                    peerConnections.forEach(call => call.close());
-                    peerConnections.clear();
-                    peer.destroy();
-                    peer = null;
-                }
-                if (localStream) {
-                    localStream.getTracks().forEach(track => track.stop());
-                    localStream = null;
-                }
-                if (voiceChannel) {
-                    voiceChannel.unsubscribe();
-                    voiceChannel = null;
-                }
-                // 移除所有遠端音訊元素
-                document.querySelectorAll('audio[id^="audio-"]').forEach(el => el.remove());
-
-                console.log('✅ 已離開會議');
-            } catch (error) {
-                console.error('離開會議失敗:', error);
-            }
-        }
-
-        // 綁定按鈕事件
-        document.getElementById('startBtn').addEventListener('click', async () => {
-            if (!isRecording) {
-                const speakerOK = await initSpeakerDetection();
-                if (speakerOK) {
-                    // 使用 AssemblyAI Batch 模式
-                    const speechOK = await startAssemblyAIBatch();
-                    if (speechOK) {
-                        isRecording = true;
-                        document.getElementById('startBtn').textContent = '停止錄音';
-                        document.getElementById('startBtn').classList.remove('btn-primary');
-                        document.getElementById('startBtn').classList.add('btn-danger');
-
-                        if (localStream) {
-                            localStream.getAudioTracks().forEach(track => {
-                                track.enabled = true;
-                            });
-                            isMicOn = true;
+                // 停止錄音
+                function stopRecording() {
+                    if (recognition) {
+                        try {
+                            recognition.stop();
+                        } catch (e) {
+                            console.error('停止語音識別失敗:', e);
                         }
                     }
+                    if (animationId) cancelAnimationFrame(animationId);
+                    if (audioContext) {
+                        try {
+                            audioContext.close();
+                        } catch (e) {
+                            console.error('關閉音訊上下文失敗:', e);
+                        }
+                    }
+                    isRecording = false;
+                    isSpeaking = false;
+                    updateSpeakingStatus(false);
+                    document.getElementById('startBtn').textContent = '開始錄音';
+                    document.getElementById('startBtn').classList.remove('btn-danger');
+                    document.getElementById('startBtn').classList.add('btn-primary');
                 }
-            } else {
-                if (localStream) {
-                    localStream.getAudioTracks().forEach(track => {
-                        track.enabled = false;
+
+                // 離開會議
+                async function leaveMeeting() {
+                    try {
+                        await supabaseClient
+                            .from('participants')
+                            .delete()
+                            .eq('meeting_id', MEETING_ID)
+                            .eq('user_id', currentUser.id);
+
+                        if (participantsChannel) participantsChannel.unsubscribe();
+                        if (captionsChannel) captionsChannel.unsubscribe();
+
+                        // 斷開 PeerJS 語音
+                        if (peer) {
+                            peerConnections.forEach(call => call.close());
+                            peerConnections.clear();
+                            peer.destroy();
+                            peer = null;
+                        }
+                        if (localStream) {
+                            localStream.getTracks().forEach(track => track.stop());
+                            localStream = null;
+                        }
+                        if (voiceChannel) {
+                            voiceChannel.unsubscribe();
+                            voiceChannel = null;
+                        }
+                        // 移除所有遠端音訊元素
+                        document.querySelectorAll('audio[id^="audio-"]').forEach(el => el.remove());
+
+                        console.log('✅ 已離開會議');
+                    } catch (error) {
+                        console.error('離開會議失敗:', error);
+                    }
+                }
+
+                // 綁定按鈕事件
+                document.getElementById('startBtn').addEventListener('click', async () => {
+                    if (!isRecording) {
+                        const speakerOK = await initSpeakerDetection();
+                        if (speakerOK) {
+                            // 使用 AssemblyAI Batch 模式
+                            const speechOK = await startAssemblyAIBatch();
+                            if (speechOK) {
+                                isRecording = true;
+                                document.getElementById('startBtn').textContent = '停止錄音';
+                                document.getElementById('startBtn').classList.remove('btn-primary');
+                                document.getElementById('startBtn').classList.add('btn-danger');
+
+                                if (localStream) {
+                                    localStream.getAudioTracks().forEach(track => {
+                                        track.enabled = true;
+                                    });
+                                    isMicOn = true;
+                                }
+                            }
+                        }
+                    } else {
+                        if (localStream) {
+                            localStream.getAudioTracks().forEach(track => {
+                                track.enabled = false;
+                            });
+                            isMicOn = false;
+                        }
+                        stopAssemblyAIBatch();
+                        stopRecording();
+                    }
+                });
+
+                document.getElementById('leaveBtn').addEventListener('click', async () => {
+                    if (confirm('確定要離開會議嗎？')) {
+                        stopAssemblyAIBatch();
+                        stopRecording();
+                        await leaveMeeting();
+                        // 回到房間列表，不登出
+                        window.location.href = 'index.html';
+                    }
+                });
+
+
+                document.getElementById('languageSelect').addEventListener('change', (e) => {
+                    if (recognition) {
+                        const wasRecording = isRecording;
+                        if (wasRecording) recognition.stop();
+                        recognition.lang = e.target.value;
+                        if (wasRecording) setTimeout(() => recognition.start(), 100);
+                    }
+                });
+
+                document.getElementById('toggleCaptions').addEventListener('click', () => {
+                    const container = document.getElementById('captionContainer');
+                    const btn = document.getElementById('toggleCaptions');
+                    container.classList.toggle('expanded');
+                    btn.textContent = container.classList.contains('expanded') ? '收合 ▼' : '展開 ▲';
+                });
+
+                // 頁面關閉時離開會議
+                window.addEventListener('beforeunload', () => {
+                    leaveMeeting();
+                });
+
+                console.log('=== 會議室初始化完成 ===');
+
+                // 注意：initPeerVoice, handleCall, playRemoteAudio 等函數已在上方定義
+
+                // 喇叭開關
+                document.getElementById('speakerBtn').addEventListener('click', () => {
+                    isSpeakerOn = !isSpeakerOn;
+                    // 控制所有遠端音訊的靜音
+                    document.querySelectorAll('audio[id^="audio-"]').forEach(audio => {
+                        audio.muted = !isSpeakerOn;
                     });
-                    isMicOn = false;
+                    updateVoiceButtons();
+                    console.log('喇叭:', isSpeakerOn ? '開啟' : '關閉');
+                });
+
+                // 音訊解鎖功能
+                let audioUnlocked = false;
+
+                function showAudioUnlockPrompt() {
+                    if (audioUnlocked) return;
+                    const overlay = document.getElementById('audioUnlockOverlay');
+                    if (overlay) {
+                        overlay.style.display = 'flex';
+                    }
                 }
-                stopAssemblyAIBatch();
-                stopRecording();
-            }
-        });
 
-        document.getElementById('leaveBtn').addEventListener('click', async () => {
-            if (confirm('確定要離開會議嗎？')) {
-                stopAssemblyAIBatch();
-                stopRecording();
-                await leaveMeeting();
-                // 回到房間列表，不登出
-                window.location.href = 'index.html';
-            }
-        });
+                function unlockAudio() {
+                    audioUnlocked = true;
+                    const overlay = document.getElementById('audioUnlockOverlay');
+                    if (overlay) {
+                        overlay.style.display = 'none';
+                    }
 
+                    // 嘗試播放所有現有的音訊元素
+                    document.querySelectorAll('audio[id^="audio-"]').forEach(audio => {
+                        audio.play().then(() => {
+                            console.log('🔊 音訊已解鎖並播放');
+                        }).catch(e => console.error('播放失敗:', e));
+                    });
 
-        document.getElementById('languageSelect').addEventListener('change', (e) => {
-            if (recognition) {
-                const wasRecording = isRecording;
-                if (wasRecording) recognition.stop();
-                recognition.lang = e.target.value;
-                if (wasRecording) setTimeout(() => recognition.start(), 100);
-            }
-        });
-
-        document.getElementById('toggleCaptions').addEventListener('click', () => {
-            const container = document.getElementById('captionContainer');
-            const btn = document.getElementById('toggleCaptions');
-            container.classList.toggle('expanded');
-            btn.textContent = container.classList.contains('expanded') ? '收合 ▼' : '展開 ▲';
-        });
-
-        // 頁面關閉時離開會議
-        window.addEventListener('beforeunload', () => {
-            leaveMeeting();
-        });
-
-        console.log('=== 會議室初始化完成 ===');
-
-        // 注意：initPeerVoice, handleCall, playRemoteAudio 等函數已在上方定義
-
-        // 喇叭開關
-        document.getElementById('speakerBtn').addEventListener('click', () => {
-            isSpeakerOn = !isSpeakerOn;
-            // 控制所有遠端音訊的靜音
-            document.querySelectorAll('audio[id^="audio-"]').forEach(audio => {
-                audio.muted = !isSpeakerOn;
-            });
-            updateVoiceButtons();
-            console.log('喇叭:', isSpeakerOn ? '開啟' : '關閉');
-        });
-
-        // 音訊解鎖功能
-        let audioUnlocked = false;
-
-        function showAudioUnlockPrompt() {
-            if (audioUnlocked) return;
-            const overlay = document.getElementById('audioUnlockOverlay');
-            if (overlay) {
-                overlay.style.display = 'flex';
-            }
-        }
-
-        function unlockAudio() {
-            audioUnlocked = true;
-            const overlay = document.getElementById('audioUnlockOverlay');
-            if (overlay) {
-                overlay.style.display = 'none';
-            }
-
-            // 嘗試播放所有現有的音訊元素
-            document.querySelectorAll('audio[id^="audio-"]').forEach(audio => {
-                audio.play().then(() => {
-                    console.log('🔊 音訊已解鎖並播放');
-                }).catch(e => console.error('播放失敗:', e));
-            });
-
-            console.log('✅ 音訊已解鎖');
-        }
-
-        // 綁定解鎖按鈕
-        const unlockBtn = document.getElementById('unlockAudioBtn');
-        if (unlockBtn) {
-            unlockBtn.addEventListener('click', unlockAudio);
-            unlockBtn.addEventListener('touchend', unlockAudio);  // 手機觸控
-        }
-
-        // 任何使用者互動都解鎖音訊（包括手機觸控）
-        ['click', 'touchstart', 'touchend'].forEach(event => {
-            document.addEventListener(event, () => {
-                if (!audioUnlocked) {
-                    unlockAudio();
+                    console.log('✅ 音訊已解鎖');
                 }
-            }, { once: true });
-        });
 
-        // 進入會議室後自動連接語音
-        setTimeout(() => {
-            if (currentUser) {
-                initPeerVoice();
-                // 顯示解鎖提示
-                showAudioUnlockPrompt();
-            }
-        }, 2000);
+                // 綁定解鎖按鈕
+                const unlockBtn = document.getElementById('unlockAudioBtn');
+                if (unlockBtn) {
+                    unlockBtn.addEventListener('click', unlockAudio);
+                    unlockBtn.addEventListener('touchend', unlockAudio);  // 手機觸控
+                }
+
+                // 任何使用者互動都解鎖音訊（包括手機觸控）
+                ['click', 'touchstart', 'touchend'].forEach(event => {
+                    document.addEventListener(event, () => {
+                        if (!audioUnlocked) {
+                            unlockAudio();
+                        }
+                    }, { once: true });
+                });
+
+                // 進入會議室後自動連接語音
+                setTimeout(() => {
+                    if (currentUser) {
+                        initPeerVoice();
+                        // 顯示解鎖提示
+                        showAudioUnlockPrompt();
+                    }
+                }, 2000);
     </script>
 </body>
 
