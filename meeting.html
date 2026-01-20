@@ -334,11 +334,11 @@
         let audioStream = null;
         let audioChunks = [];
 
-        // VAD 連續錄音設定（平衡穩定版）
+        // VAD 連續錄音設定（延長版 - 減少幻覺）
         const SILENCE_THRESHOLD = 20;     // 語音門檻
-        const SILENCE_DURATION = 1500;    // 停頓 1.5 秒才切（給予更多語意空間）
+        const SILENCE_DURATION = 2000;    // 停頓 2 秒才切（給予更多語意空間）
         const MIN_AUDIO_DURATION = 3000;  // 最短錄滿 3 秒
-        const MAX_AUDIO_DURATION = 7000;  // 精確設定為 7 秒（6-8 秒的中間值）
+        const MAX_AUDIO_DURATION = 10000; // 延長至 10 秒（更多脈絡減少幻覺）
         const MAX_CONCURRENT_REQUESTS = 1; // 回歸穩定並行
         const MIN_AUDIO_SIZE = 5000;      // 恢復標準體積限制
 
