@@ -31,7 +31,7 @@ serve(async (req) => {
 
     // 根據模式決定 Prompt
     let systemPrompt = "";
-    let targetModel = requestedModel || "google/gemini-2.0-flash-exp:free";
+    let targetModel = requestedModel || "meta-llama/llama-3.2-3b-instruct:free";
 
     if (mode === "punctuation") {
       systemPrompt = "你是一個專業的中文標點符號處理助手。你的任務是接收用戶傳送的原始轉錄文字，並為其補上正確的繁體中文標點符號。規則：1. 禁止修改、刪除、增加任何原本的文字內容。2. 禁止修正語法。3. 禁止進行摘要。4. 必須 100% 保留所有原始字詞。只輸出加了標點的文字，不要有任何說明。";
