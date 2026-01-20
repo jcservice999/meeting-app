@@ -353,7 +353,10 @@
                 }
 
                 console.log('✅ AssemblyAI Batch 語音轉錄已啟動');
-                showInterimCaption('正在聆聽 (每 6 秒分析一次)...');
+                showInterimCaption('正在聆聯 (每 6 秒分析一次)...');
+
+                // ⚠️ 重要：先設定 isRecording，再啟動錄音循環
+                isRecording = true;
 
                 // 啟動錄音循環
                 startRecordingLoop(streamToUse);
