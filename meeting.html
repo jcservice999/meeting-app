@@ -400,14 +400,19 @@
 
                 mediaRecorder.onstop = async () => {
                     console.log('⏹️ MediaRecorder 停止，audioChunks.length =', audioChunks.length);
-                    // ⚠️ 關鍵：一停止馬上開始下一段，把空窗期縮到最小
+
+                    // ⚠️ 關鍵修正：先保存當前的 chunks，再開始下一輪
+                    const chunksToProcess = [...audioChunks]; // 複製一份
+
+                    // 馬上開始下一段，把空窗期縮到最小
                     if (isRecording) {
                         recordNextChunk();
                     }
 
-                    if (audioChunks.length === 0) return;
+                    // 用保存的 chunks 來處理（不會被新錄音覆蓋）
+                    if (chunksToProcess.length === 0) return;
 
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioBlob = new Blob(chunksToProcess, { type: 'audio/webm' });
                     console.log('📦 準備上傳 Blob:', audioBlob.size, 'bytes');
                     if (audioBlob.size < 1000) return;
 
