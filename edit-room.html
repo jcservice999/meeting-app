@@ -152,12 +152,20 @@
             </div>
         </div>
 
+        <div class="form-group">
+            <label for="wordBoost">🎯 關鍵詞設定 (Word Boost)</label>
+            <textarea id="wordBoost" placeholder="每行一個關鍵詞&#10;JBS商學院&#10;股價&#10;成長價值"></textarea>
+            <div class="help-text">
+                輸入會議中常用的關鍵詞，可提升語音辨識準確度。每行一個，最多 100 個詞。
+            </div>
+        </div>
+
         <div class="button-group">
             <button type="button" class="btn btn-secondary" onclick="window.location.href='rooms.html'">
                 取消
             </button>
-            <button type="button" class="btn btn-primary" onclick="addEmails()">
-                新增 Email
+            <button type="button" class="btn btn-primary" onclick="saveAll()">
+                儲存變更
             </button>
         </div>
     </div>
@@ -226,6 +234,11 @@
 
                 const emailsHtml = access.map(a => `<span class="email-tag">${a.email}<button onclick="removeEmail('${a.email}')">×</button></span>`).join('');
                 document.getElementById('currentEmails').innerHTML = emailsHtml || '無';
+
+                // 載入 Word Boost 關鍵詞
+                if (room.word_boost && room.word_boost.length > 0) {
+                    document.getElementById('wordBoost').value = room.word_boost.join('\n');
+                }
 
             } catch (error) {
                 console.error('載入房間失敗:', error);
@@ -304,6 +317,63 @@
             } catch (error) {
                 console.error('移除 Email 失敗:', error);
                 alert('移除失敗：' + error.message);
+            }
+        }
+
+        // 儲存所有變更（Email + Word Boost）
+        async function saveAll() {
+            try {
+                // 1. 處理新增 Email
+                const newEmailsText = document.getElementById('newEmails').value.trim();
+                if (newEmailsText) {
+                    const newEmails = newEmailsText
+                        .split('\n')
+                        .map(e => e.trim())
+                        .filter(e => e.length > 0);
+
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    const invalidEmails = newEmails.filter(e => !emailRegex.test(e));
+
+                    if (invalidEmails.length > 0) {
+                        alert('以下 email 格式不正確：\n' + invalidEmails.join('\n'));
+                        return;
+                    }
+
+                    const accessRecords = newEmails.map(email => ({
+                        room_id: roomId,
+                        email: email,
+                        added_by: currentUser.id
+                    }));
+
+                    const { error: emailError } = await supabaseClient
+                        .from('room_access')
+                        .upsert(accessRecords, { onConflict: 'room_id,email' });
+
+                    if (emailError) throw emailError;
+                }
+
+                // 2. 處理 Word Boost 關鍵詞
+                const wordBoostText = document.getElementById('wordBoost').value.trim();
+                const wordBoost = wordBoostText
+                    .split('\n')
+                    .map(w => w.trim())
+                    .filter(w => w.length > 0)
+                    .slice(0, 100); // 最多 100 個詞
+
+                const { error: boostError } = await supabaseClient
+                    .from('rooms')
+                    .update({ word_boost: wordBoost })
+                    .eq('room_id', roomId);
+
+                if (boostError) throw boostError;
+
+                alert('✅ 儲存成功！');
+                document.getElementById('newEmails').value = '';
+                loadRoom(); // 重新載入
+
+            } catch (error) {
+                console.error('儲存失敗:', error);
+                alert('儲存失敗：' + error.message);
             }
         }
 

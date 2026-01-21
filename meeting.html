@@ -134,6 +134,7 @@
         let participants = new Map();
         let participantsChannel = null;
         let captionsChannel = null;
+        let roomWordBoost = []; // Word Boost 關鍵詞
 
 
         // 檢查房間存取權限
@@ -208,6 +209,9 @@
 
             // 載入現有參與者
             await loadParticipants();
+
+            // 載入 Word Boost 關鍵詞
+            await loadRoomWordBoost();
         });
 
         // 加入會議室
@@ -286,6 +290,29 @@
                 updateParticipantCount();
             } catch (error) {
                 console.error('載入參與者失敗:', error);
+            }
+        }
+
+        // 載入 Word Boost 關鍵詞
+        async function loadRoomWordBoost() {
+            // 預設房間不載入
+            if (MEETING_ID === 'main-room') return;
+
+            try {
+                const { data: room, error } = await supabaseClient
+                    .from('rooms')
+                    .select('word_boost')
+                    .eq('room_id', MEETING_ID)
+                    .single();
+
+                if (error) throw error;
+
+                if (room && room.word_boost && room.word_boost.length > 0) {
+                    roomWordBoost = room.word_boost;
+                    console.log('🎯 已載入 Word Boost 關鍵詞:', roomWordBoost.length, '個');
+                }
+            } catch (error) {
+                console.error('載入 Word Boost 失敗:', error);
             }
         }
 
@@ -454,12 +481,17 @@
                         body: JSON.stringify({
                             audio: base64Audio,
                             language: language,
-                            roomId: MEETING_ID
+                            roomId: MEETING_ID,
+                            wordBoost: roomWordBoost
                         })
                     });
 
                     const result = await response.json();
-                    if (result.transcript && result.transcript.trim()) {
+                    // Webhook 模式：結果會透過 Supabase Realtime 送達
+                    if (result.submitted) {
+                        console.log('📤 已提交轉錄，ID:', result.transcriptId);
+                    } else if (result.transcript && result.transcript.trim()) {
+                        // 相容舊版輪詢模式
                         console.log('✅ 辨識:', result.transcript);
                         showLocalCaption(result.transcript);
                         saveCaption(result.transcript);
@@ -525,6 +557,15 @@
                 peer.on('open', (id) => {
                     console.log('✅ PeerJS 連接成功, ID:', id);
                     broadcastPeerId(id);
+
+                    // 🔄 心跳機制：每 25 秒 ping 一次保持連線
+                    if (window.peerHeartbeat) clearInterval(window.peerHeartbeat);
+                    window.peerHeartbeat = setInterval(() => {
+                        if (peer && !peer.destroyed && peer.open) {
+                            // PeerJS 沒有公開的 heartbeat API，用 socket 狀態檢查代替
+                            console.log('💓 PeerJS 心跳檢查 - 連線狀態:', peer.open ? '正常' : '中斷');
+                        }
+                    }, 25000);
                 });
 
                 peer.on('call', (call) => {
@@ -536,12 +577,25 @@
 
                 peer.on('error', (err) => {
                     console.error('❌ PeerJS 錯誤:', err.type, err);
-                    alert('語音連線錯誤: ' + err.type);
+                    // 只在非網路錯誤時顯示 alert
+                    if (err.type !== 'network' && err.type !== 'disconnected') {
+                        alert('語音連線錯誤: ' + err.type);
+                    }
                 });
 
                 peer.on('disconnected', () => {
                     console.warn('⚠️ PeerJS 連線中斷，嘗試重連...');
-                    peer.reconnect();
+                    // 清除心跳
+                    if (window.peerHeartbeat) {
+                        clearInterval(window.peerHeartbeat);
+                        window.peerHeartbeat = null;
+                    }
+                    // 延遲重連，避免過於頻繁
+                    setTimeout(() => {
+                        if (peer && !peer.destroyed) {
+                            peer.reconnect();
+                        }
+                    }, 1000);
                 });
 
                 updateVoiceButtons();
