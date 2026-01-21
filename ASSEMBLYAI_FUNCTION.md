@@ -112,6 +112,8 @@ serve(async (req) => {
         language_code: language === "zh-TW" ? "zh" : "en",
         word_boost: wordBoost || [],
         boost_param: "high",
+        punctuate: true,
+        format_text: true,
         webhook_url: webhookUrl
       })
     });

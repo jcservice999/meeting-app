@@ -264,10 +264,8 @@
                     filter: `meeting_id=eq.${MEETING_ID}`
                 }, (payload) => {
                     console.log('新字幕:', payload.new);
-                    // ✅ 修正：如果是自己發送的字幕，忽略不顯示（因為本地已經顯示過）
-                    if (payload.new.user_id !== currentUser.id) {
-                        displayRemoteCaption(payload.new);
-                    }
+                    // Webhook 模式：所有字幕都透過 Realtime 接收，不需要過濾自己
+                    displayRemoteCaption(payload.new);
                 })
                 .subscribe();
         }
