@@ -1,56 +1,33 @@
-# rapid-action Edge Function 更新
+# rapid-action Edge Function 標點功能優化
 
-## 新增功能：標點符號和錯別字修正
+## 問題
+目前 `mode === "punctuation"` 的 prompt 產生的結果沒有正確加標點。
 
-請在現有的 `rapid-action` Edge Function 中，在 `serve` 函數內加入對 `punctuate` action 的處理：
+## 解決方案
+
+請將 `rapid-action` Edge Function 中的 `systemPrompt` 修改為：
 
 ```typescript
-const { action, text, conversationText } = await req.json();
+if (mode === "punctuation") {
+  systemPrompt = `你是專業的中文語音轉錄校正助手。
 
-// 處理標點符號和錯別字修正
-if (action === 'punctuate' && text) {
-  const apiKey = Deno.env.get('OPENROUTER_API_KEY');
-  
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.0-flash-exp:free',
-      messages: [{
-        role: 'user',
-        content: `請處理以下中文語音轉錄文字：
-1. 添加適當的標點符號（句號、逗號、問號等）
-2. 根據上下文修正明顯的錯別字（例如同音字錯誤）
-3. 不要改變原意或大幅修改語句
+任務：
+1. 為文字添加適當的繁體中文標點符號（句號。、逗號，、問號？、驚嘆號！等）
+2. 修正明顯的同音字錯誤（如「在/再」、「他/她/它」、「的/地/得」）
 
-只回傳處理後的文字，不要任何解釋。
+規則：
+- 不可刪除或增加任何詞語
+- 不可改變語句順序
+- 只輸出處理後的文字，不要有任何說明或解釋
 
-原文：${text}`
-      }],
-      max_tokens: 500
-    })
-  });
-
-  const data = await response.json();
-  const result = data.choices?.[0]?.message?.content?.trim() || text;
-
-  return new Response(JSON.stringify({ result }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
-}
-
-// 原有的會議摘要功能
-if (conversationText) {
-  // ... 現有摘要邏輯 ...
+範例輸入：各位億萬富豪的同學們大家好我來補充一下拍星辰哦那一天真的很抱歉就是時間不足
+範例輸出：各位億萬富豪的同學們，大家好！我來補充一下拍星辰哦，那一天真的很抱歉，就是時間不足。`;
 }
 ```
 
 ## 部署步驟
 
-1. 進入 Supabase Dashboard → Edge Functions → `rapid-action`
-2. 點擊 **Code** 標籤
-3. 在現有程式碼中加入上述 `if (action === 'punctuate')` 區塊
-4. 點擊 **Deploy**
+1. Supabase Dashboard → Edge Functions → `rapid-action` → Code
+2. 找到 `if (mode === "punctuation")` 區塊
+3. 替換 `systemPrompt` 的內容
+4. 點擊 Deploy

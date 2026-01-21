@@ -453,13 +453,13 @@
                 mediaRecorder.start();
                 console.log('▶️ MediaRecorder 開始錄音');
 
-                // 10秒後停止這一段 -> 觸發 onstop -> 立即開始下一段
+                // 20秒後停止這一段 -> 觸發 onstop -> 立即開始下一段
                 setTimeout(() => {
                     if (mediaRecorder && mediaRecorder.state === 'recording') {
-                        console.log('⏰ 10秒到，停止錄音');
+                        console.log('⏰ 20秒到，停止錄音');
                         mediaRecorder.stop();
                     }
-                }, 10000);
+                }, 20000);
             }
 
             // 啟動第一次
