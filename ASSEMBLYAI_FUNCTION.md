@@ -101,9 +101,7 @@ serve(async (req) => {
 
     const { upload_url } = await uploadRes.json();
 
-    // 2. 建立轉錄（使用 Webhook 取代輪詢）
-    const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/assemblyai-webhook?roomId=${roomId}&userId=${user.id}`;
-    
+    // 2. 建立轉錄（輪詢模式）
     const transcriptRes = await fetch("https://api.assemblyai.com/v2/transcript", {
       method: "POST",
       headers: { "Authorization": apiKey, "Content-Type": "application/json" },
@@ -113,20 +111,30 @@ serve(async (req) => {
         word_boost: wordBoost || [],
         boost_param: "high",
         punctuate: true,
-        format_text: true,
-        webhook_url: webhookUrl
+        format_text: true
       })
     });
 
     const { id: transcriptId } = await transcriptRes.json();
-    console.log("📤 已提交轉錄，ID:", transcriptId);
 
-    // 立即返回，結果會透過 webhook 送達
-    return new Response(JSON.stringify({ 
-      submitted: true, 
-      transcriptId,
-      success: true 
-    }), {
+    // 3. 等待結果（最多 30 秒）
+    let transcript = "";
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      const pollRes = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
+        headers: { "Authorization": apiKey }
+      });
+      const poll = await pollRes.json();
+      
+      if (poll.status === "completed") {
+        transcript = poll.text || "";
+        break;
+      } else if (poll.status === "error") {
+        throw new Error(poll.error);
+      }
+    }
+
+    return new Response(JSON.stringify({ transcript, success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
 
