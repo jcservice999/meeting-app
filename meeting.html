@@ -264,8 +264,9 @@
                     table: 'captions'
                 }, (payload) => {
                     console.log('📝 收到字幕事件:', payload.new);
-                    // 只顯示當前會議室的字幕
-                    if (payload.new.meeting_id === MEETING_ID) {
+                    // 只顯示當前會議室的字幕，且忽略自己的（避免重複顯示）
+                    if (payload.new.meeting_id === MEETING_ID &&
+                        payload.new.user_id !== currentUser?.id) {
                         displayRemoteCaption(payload.new);
                     }
                 })
@@ -979,8 +980,8 @@
                         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
                     },
                     body: JSON.stringify({
-                        action: 'punctuate',
-                        text: text
+                        mode: 'punctuation',
+                        conversationText: text
                     })
                 });
 
@@ -990,7 +991,7 @@
                 }
 
                 const data = await response.json();
-                return data.result || data.summary || text;
+                return data.text || data.summary || text;
             } catch (error) {
                 console.warn('AI 處理錯誤:', error);
                 return text;
