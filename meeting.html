@@ -20,7 +20,9 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -29,21 +31,28 @@
 
         .audio-unlock-content {
             text-align: center;
-            color: white;
-            padding: 40px;
-            border-radius: 16px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
+            color: #1f2937;
+            padding: 48px;
+            border-radius: 32px;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
         }
 
         .audio-unlock-content h2 {
             margin: 20px 0 10px;
             font-size: 24px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .audio-unlock-content p {
             margin-bottom: 24px;
-            opacity: 0.8;
+            color: #4b5563;
         }
     </style>
 </head>

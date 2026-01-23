@@ -1,22 +1,93 @@
-/* 共用樣式 */
+/* 共用樣式 - Liquid Glass 風格 2.0 */
 :root {
-    --primary-color: #6366f1;
-    --primary-dark: #4f46e5;
-    --success-color: #10b981;
-    --danger-color: #ef4444;
-    --warning-color: #f59e0b;
+    /* ===== 主色調 - 精緻紫青漸層 ===== */
+    --primary-gradient: linear-gradient(135deg, #9f7aea 0%, #38b2ac 100%);
+    --accent-gradient: linear-gradient(135deg, #b794f4 0%, #4fd1c5 100%);
+    --secondary-gradient: linear-gradient(135deg, #667eea 0%, #38b2ac 100%);
+    --glass-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.08) 100%);
 
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --bg-tertiary: #334155;
+    /* 按鈕漸層 */
+    --btn-purple: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
+    --btn-teal: linear-gradient(135deg, #38b2ac 0%, #319795 100%);
+    --btn-pink: linear-gradient(145deg, #ed8fd0 0%, #d27cc8 50%, #a78bfa 100%);
+    --btn-success: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    --btn-danger: linear-gradient(135deg, #fc8181 0%, #f56565 100%);
 
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --text-muted: #94a3b8;
+    /* 主題色 */
+    --primary-color: #9f7aea;
+    --primary-dark: #805ad5;
+    --accent-color: #38b2ac;
+    --accent-dark: #319795;
+    --success-color: #48bb78;
+    --danger-color: #fc8181;
+    --warning-color: #f6ad55;
 
-    --border-color: rgba(148, 163, 184, 0.2);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    /* ===== 背景 - 柔和奶油色調 ===== */
+    --bg-base: linear-gradient(160deg,
+            #f0ebe3 0%,
+            #e8e2d9 25%,
+            #ddd6cc 50%,
+            #d8d0c5 75%,
+            #d0c8bc 100%);
+    --bg-overlay: radial-gradient(ellipse at 70% 20%, rgba(167, 139, 250, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 30% 80%, rgba(79, 209, 197, 0.1) 0%, transparent 40%);
+
+    /* 玻璃效果 */
+    --glass-bg: rgba(255, 255, 255, 0.4);
+    --glass-bg-light: rgba(255, 255, 255, 0.55);
+    --glass-bg-dark: rgba(255, 255, 255, 0.25);
+    --glass-bg-card: rgba(255, 255, 255, 0.45);
+    --glass-bg-hover: rgba(255, 255, 255, 0.6);
+
+    /* 文字顏色 */
+    --text-primary: #2d3748;
+    --text-secondary: #4a5568;
+    --text-muted: #718096;
+    --text-light: #ffffff;
+    --text-gradient: linear-gradient(135deg, #667eea 0%, #38b2ac 100%);
+
+    /* 邊框和陰影 */
+    --border-glass: rgba(255, 255, 255, 0.5);
+    --border-glass-strong: rgba(255, 255, 255, 0.7);
+    --border-color-light: rgba(255, 255, 255, 0.3);
+
+    /* 陰影系統 */
+    --shadow-glass:
+        0 4px 24px rgba(0, 0, 0, 0.08),
+        0 1px 3px rgba(0, 0, 0, 0.04),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    --shadow-glass-lg:
+        0 8px 40px rgba(0, 0, 0, 0.1),
+        0 2px 8px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    --shadow-glass-xl:
+        0 16px 64px rgba(0, 0, 0, 0.12),
+        0 4px 16px rgba(0, 0, 0, 0.06),
+        inset 0 2px 0 rgba(255, 255, 255, 0.8);
+    --shadow-btn:
+        0 4px 16px rgba(159, 122, 234, 0.25),
+        0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-float:
+        0 20px 60px rgba(0, 0, 0, 0.15),
+        0 8px 20px rgba(0, 0, 0, 0.08);
+
+    /* 模糊效果 */
+    --blur-glass: blur(24px);
+    --blur-light: blur(12px);
+    --blur-strong: blur(40px);
+
+    /* 圓角 */
+    --radius-sm: 12px;
+    --radius-md: 16px;
+    --radius-lg: 24px;
+    --radius-xl: 32px;
+    --radius-pill: 50px;
+    --radius-full: 9999px;
+
+    /* 過渡 */
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 * {
@@ -26,142 +97,379 @@
 }
 
 body {
-    font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
-    background: var(--bg-primary);
+    font-family: 'Inter', 'Segoe UI', 'Microsoft JhengHei', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-base);
     color: var(--text-primary);
     line-height: 1.6;
+    min-height: 100vh;
+    position: relative;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-overlay);
+    pointer-events: none;
+    z-index: 0;
 }
 
 .hidden {
     display: none !important;
 }
 
-/* 按鈕樣式 */
+/* ===== 毛玻璃按鈕 - Primary ===== */
 .btn-primary {
-    background: var(--primary-color);
+    background: var(--btn-purple);
     color: white;
     border: none;
-    border-radius: 8px;
-    padding: 0.6rem 1.2rem;
+    border-radius: var(--radius-pill);
+    padding: 0.75rem 1.75rem;
     cursor: pointer;
-    font-size: 1rem;
-    transition: all 0.3s ease;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: var(--transition-bounce);
+    box-shadow: var(--shadow-btn);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.25) 0%, transparent 100%);
+    border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+    pointer-events: none;
 }
 
 .btn-primary:hover {
-    background: var(--primary-dark);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow:
+        0 8px 28px rgba(159, 122, 234, 0.4),
+        0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+.btn-primary:active {
+    transform: translateY(-1px) scale(0.98);
+}
+
+/* ===== 毛玻璃按鈕 - Secondary ===== */
 .btn-secondary {
-    background: var(--bg-tertiary);
+    background: var(--glass-bg);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
     color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 0.6rem 1.2rem;
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-pill);
+    padding: 0.75rem 1.75rem;
     cursor: pointer;
-    transition: all 0.3s ease;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: var(--transition-smooth);
+    box-shadow: var(--shadow-glass);
+    position: relative;
+}
+
+.btn-secondary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 0%, transparent 100%);
+    border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+    pointer-events: none;
 }
 
 .btn-secondary:hover {
-    background: var(--bg-secondary);
+    background: var(--glass-bg-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glass-lg);
 }
 
-.btn-danger {
-    background: var(--danger-color);
+/* ===== 毛玻璃按鈕 - Teal ===== */
+.btn-teal {
+    background: var(--btn-teal);
     color: white;
     border: none;
-    border-radius: 8px;
-    padding: 0.6rem 1.2rem;
+    border-radius: var(--radius-pill);
+    padding: 0.75rem 1.75rem;
     cursor: pointer;
-    transition: all 0.3s ease;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: var(--transition-bounce);
+    box-shadow: 0 4px 16px rgba(56, 178, 172, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-teal::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.25) 0%, transparent 100%);
+    border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+    pointer-events: none;
+}
+
+.btn-teal:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 28px rgba(56, 178, 172, 0.4);
+}
+
+/* ===== 毛玻璃按鈕 - Danger ===== */
+.btn-danger {
+    background: var(--btn-danger);
+    color: white;
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 0.75rem 1.75rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: var(--transition-bounce);
+    box-shadow: 0 4px 16px rgba(252, 129, 129, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-danger::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
+    border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+    pointer-events: none;
 }
 
 .btn-danger:hover {
-    background: #dc2626;
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 28px rgba(252, 129, 129, 0.45);
 }
 
+/* ===== 毛玻璃按鈕 - Success ===== */
+.btn-approve,
+.btn-success {
+    background: var(--btn-success);
+    color: white;
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 0.75rem 1.75rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: var(--transition-bounce);
+    box-shadow: 0 4px 16px rgba(72, 187, 120, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-approve::before,
+.btn-success::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.25) 0%, transparent 100%);
+    border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+    pointer-events: none;
+}
+
+.btn-approve:hover,
+.btn-success:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 28px rgba(72, 187, 120, 0.45);
+}
+
+/* ===== Icon Button ===== */
 .btn-icon {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 0.6rem;
+    background: var(--glass-bg);
+    backdrop-filter: var(--blur-light);
+    -webkit-backdrop-filter: var(--blur-light);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-full);
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     font-size: 1.2rem;
-    transition: all 0.3s ease;
+    transition: var(--transition-bounce);
+    box-shadow: var(--shadow-glass);
+    position: relative;
+}
+
+.btn-icon::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    height: 45%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.6) 0%, transparent 100%);
+    border-radius: var(--radius-full);
+    pointer-events: none;
 }
 
 .btn-icon:hover {
-    background: var(--bg-secondary);
+    background: var(--glass-bg-hover);
+    transform: scale(1.1);
+    box-shadow: var(--shadow-glass-lg);
 }
 
+/* ===== Small Button ===== */
 .btn-small {
-    background: var(--bg-tertiary);
+    background: var(--glass-bg);
+    backdrop-filter: var(--blur-light);
+    -webkit-backdrop-filter: var(--blur-light);
     color: var(--text-primary);
-    border: none;
-    border-radius: 5px;
-    padding: 0.3rem 0.8rem;
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    padding: 0.4rem 1.1rem;
     font-size: 0.85rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--transition-smooth);
+    box-shadow: var(--shadow-glass);
 }
 
 .btn-small:hover {
-    background: var(--primary-color);
-}
-
-.btn-approve {
-    background: var(--success-color);
+    background: var(--primary-gradient);
     color: white;
+    border-color: transparent;
+    transform: translateY(-1px);
 }
 
-.btn-approve:hover {
-    background: #059669;
-}
-
+/* ===== Reject Button ===== */
 .btn-reject {
-    background: var(--danger-color);
+    background: var(--btn-danger);
     color: white;
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 0.75rem 1.75rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: var(--transition-bounce);
 }
 
-.btn-reject:hover {
-    background: #dc2626;
-}
-
-/* 對話框 */
+/* ===== 毛玻璃對話框 ===== */
 .modal {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(45, 55, 72, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 .modal-content {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 15px;
+    background: var(--glass-bg-light);
+    backdrop-filter: var(--blur-strong);
+    -webkit-backdrop-filter: var(--blur-strong);
+    border: 1px solid var(--border-glass-strong);
+    border-radius: var(--radius-xl);
     padding: 2rem;
     max-width: 500px;
     width: 90%;
+    box-shadow: var(--shadow-float);
+    position: relative;
+    animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.modal-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 0%, transparent 100%);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    pointer-events: none;
 }
 
 .modal-content h3 {
     margin-bottom: 1rem;
+    font-size: 1.4rem;
+    font-weight: 700;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
-.modal-content input[type="file"] {
+.modal-content input[type="file"],
+.modal-content input[type="text"],
+.modal-content textarea {
     width: 100%;
-    margin: 1rem 0;
-    padding: 0.5rem;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    margin: 0.5rem 0;
+    padding: 0.9rem 1.2rem;
+    background: var(--glass-bg);
+    backdrop-filter: var(--blur-light);
+    -webkit-backdrop-filter: var(--blur-light);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
     color: var(--text-primary);
+    font-size: 0.95rem;
+    transition: var(--transition-smooth);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03);
+}
+
+.modal-content input:focus,
+.modal-content textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow:
+        0 0 0 3px rgba(159, 122, 234, 0.15),
+        inset 0 2px 4px rgba(0, 0, 0, 0.03);
 }
 
 .modal-actions {
@@ -171,8 +479,220 @@ body {
     margin-top: 1.5rem;
 }
 
+/* ===== Empty Message ===== */
 .empty-message {
     text-align: center;
     color: var(--text-muted);
-    padding: 1rem;
+    padding: 2.5rem;
+    background: var(--glass-bg);
+    backdrop-filter: var(--blur-light);
+    -webkit-backdrop-filter: var(--blur-light);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-glass);
+    box-shadow: var(--shadow-glass);
+}
+
+/* ===== 下拉選單 ===== */
+select {
+    background: var(--glass-bg);
+    backdrop-filter: var(--blur-light);
+    -webkit-backdrop-filter: var(--blur-light);
+    color: var(--text-primary);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    padding: 0.6rem 1.2rem;
+    padding-right: 2.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: var(--transition-smooth);
+    box-shadow: var(--shadow-glass);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234a5568' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+}
+
+select:hover {
+    background-color: var(--glass-bg-hover);
+}
+
+select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(159, 122, 234, 0.15);
+}
+
+/* ===== 卡片基礎樣式 ===== */
+.glass-card {
+    background: var(--glass-bg-card);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-glass);
+    position: relative;
+    transition: var(--transition-smooth);
+}
+
+.glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.4) 0%, transparent 100%);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    pointer-events: none;
+}
+
+.glass-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-glass-lg);
+}
+
+/* ===== 漸層卡片 - 粉紫色 ===== */
+.gradient-card {
+    background: linear-gradient(145deg,
+            rgba(237, 143, 208, 0.3) 0%,
+            rgba(210, 124, 200, 0.3) 50%,
+            rgba(167, 139, 250, 0.25) 100%);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-glass);
+    position: relative;
+}
+
+.gradient-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.35) 0%, transparent 100%);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    pointer-events: none;
+}
+
+/* ===== 標籤樣式 ===== */
+.tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.9rem;
+    background: var(--glass-bg);
+    backdrop-filter: var(--blur-light);
+    -webkit-backdrop-filter: var(--blur-light);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-full);
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: var(--transition-smooth);
+}
+
+.tag.active {
+    background: var(--primary-gradient);
+    color: white;
+    border: none;
+}
+
+/* ===== Checkbox 樣式 ===== */
+input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    background: var(--glass-bg);
+    border: 1px solid var(--border-glass);
+    border-radius: 6px;
+    cursor: pointer;
+    position: relative;
+    transition: var(--transition-smooth);
+}
+
+input[type="checkbox"]:checked {
+    background: var(--primary-gradient);
+    border: none;
+}
+
+input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* ===== 滾動條 - 毛玻璃風格 ===== */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(159, 122, 234, 0.5) 0%, rgba(56, 178, 172, 0.5) 100%);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(159, 122, 234, 0.7) 0%, rgba(56, 178, 172, 0.7) 100%);
+    background-clip: padding-box;
+}
+
+/* ===== 動畫輔助類別 ===== */
+.fade-in {
+    animation: fadeIn 0.5s ease forwards;
+}
+
+.slide-up {
+    animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ===== 文字漸層 ===== */
+.text-gradient {
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ===== 懸浮光效 ===== */
+.glow-effect {
+    position: relative;
+}
+
+.glow-effect::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(159, 122, 234, 0.3) 0%, transparent 70%);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+}
+
+.glow-effect:hover::after {
+    opacity: 1;
 }

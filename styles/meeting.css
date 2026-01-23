@@ -1,85 +1,166 @@
-/* 會議室樣式 - Zoom 風格 */
+/* 會議室樣式 - Liquid Glass 風格 2.0 */
+
+/* ===== 主容器 ===== */
 .meeting-container {
     display: flex;
     flex-direction: column;
     height: 100vh;
     height: 100dvh;
-    /* 動態視口高度，適應手機瀏覽器 */
     overflow: hidden;
-    background: #1a1a1a;
-    /* 手機瀏覽器安全區域 */
+    background: linear-gradient(160deg,
+            #f0ebe3 0%,
+            #e8e2d9 25%,
+            #ddd6cc 50%,
+            #d8d0c5 75%,
+            #d0c8bc 100%);
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+    position: relative;
 }
 
-/* 頂部工具列 */
+/* 背景光效 */
+.meeting-container::before {
+    content: '';
+    position: fixed;
+    top: -20%;
+    right: -10%;
+    width: 50%;
+    height: 60%;
+    background: radial-gradient(ellipse, rgba(167, 139, 250, 0.2) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.meeting-container::after {
+    content: '';
+    position: fixed;
+    bottom: -20%;
+    left: -10%;
+    width: 50%;
+    height: 60%;
+    background: radial-gradient(ellipse, rgba(79, 209, 197, 0.15) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ===== 頂部工具列 - 毛玻璃 ===== */
 .meeting-header {
-    background: rgba(30, 30, 30, 0.95);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 0.8rem 1.5rem;
-    padding-top: max(0.8rem, env(safe-area-inset-top));
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 0 0 28px 28px;
+    padding: 1rem 1.5rem;
+    padding-top: max(1rem, env(safe-area-inset-top));
     display: flex;
     justify-content: space-between;
     align-items: center;
     z-index: 10;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    margin: 0 12px;
+    position: relative;
+}
+
+/* 頂部光效 */
+.meeting-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 0%, transparent 100%);
+    border-radius: 0 0 28px 28px;
+    pointer-events: none;
 }
 
 .header-left {
     display: flex;
     align-items: center;
     gap: 1rem;
+    position: relative;
+    z-index: 1;
 }
 
 .header-left h1 {
-    font-size: 1.2rem;
-    font-weight: 600;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #2d3748;
+    letter-spacing: 0.01em;
 }
 
 .participant-count {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 0.3rem 0.8rem;
-    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(159, 122, 234, 0.2) 0%, rgba(56, 178, 172, 0.2) 100%);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 0.45rem 1.1rem;
+    border-radius: 24px;
     font-size: 0.85rem;
-    color: rgba(255, 255, 255, 0.7);
+    color: #6b46c1;
+    font-weight: 600;
+    border: 1px solid rgba(159, 122, 234, 0.3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .header-right {
     display: flex;
     align-items: center;
     gap: 0.8rem;
+    position: relative;
+    z-index: 1;
 }
 
 .language-select {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-    padding: 0.4rem 0.8rem;
+    background: rgba(255, 255, 255, 0.6);
+    color: #2d3748;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 14px;
+    padding: 0.55rem 1.2rem;
+    padding-right: 2.5rem;
     cursor: pointer;
     font-size: 0.9rem;
+    font-weight: 500;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%232d3748' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
 }
 
-/* 主要內容區 */
+.language-select:hover {
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow:
+        0 6px 20px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* ===== 主要內容區 ===== */
 .meeting-main {
     flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     position: relative;
-    background: #1a1a1a;
+    padding: 12px;
+    z-index: 1;
 }
 
-/* 參與者網格 - Zoom 風格 */
+/* ===== 參與者網格 - 毛玻璃風格 ===== */
 .participant-grid {
     flex: 1;
     display: grid;
-    gap: 12px;
-    padding: 12px;
+    gap: 16px;
+    padding: 8px;
     overflow-y: auto;
-    background: #1a1a1a;
     grid-auto-rows: 1fr;
 }
 
@@ -115,28 +196,62 @@
     grid-template-rows: repeat(3, 1fr);
 }
 
+/* ===== 參與者卡片 - 毛玻璃 ===== */
 .participant-card {
-    background: #262626;
-    border: 2px solid transparent;
-    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 28px;
     display: flex;
     flex-direction: column;
     position: relative;
     overflow: hidden;
-    transition: all 0.2s ease;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     width: 100%;
     height: 100%;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.08),
+        0 2px 8px rgba(0, 0, 0, 0.04),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* 頂部光效 */
+.participant-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.4) 0%, transparent 100%);
+    border-radius: 28px 28px 0 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.participant-card:hover {
+    transform: translateY(-6px) scale(1.01);
+    box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.12),
+        0 8px 20px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .participant-card.speaking {
-    border-color: #10b981;
-    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+    border: 2px solid rgba(72, 187, 120, 0.6);
+    box-shadow:
+        0 0 0 4px rgba(72, 187, 120, 0.15),
+        0 8px 32px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .participant-photo {
     width: 100%;
     height: 100%;
-    background: #1a1a1a;
+    background: linear-gradient(145deg,
+            rgba(255, 255, 255, 0.3) 0%,
+            rgba(255, 255, 255, 0.1) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -147,133 +262,169 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
-    background: #1a1a1a;
+    background: transparent;
 }
 
 .photo-placeholder {
     font-size: 4rem;
-    color: rgba(255, 255, 255, 0.3);
-    font-weight: 600;
+    background: linear-gradient(135deg, #9f7aea 0%, #38b2ac 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
 }
 
 .participant-name {
     position: absolute;
-    bottom: 8px;
-    left: 8px;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
-    padding: 4px 12px;
-    border-radius: 4px;
+    bottom: 14px;
+    left: 14px;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 8px 18px;
+    border-radius: 24px;
     font-size: 0.9rem;
-    font-weight: 500;
-    color: #fff;
+    font-weight: 600;
+    color: #2d3748;
     z-index: 2;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
-/* 字幕容器 - 固定在底部 */
+/* ===== 字幕容器 - 毛玻璃 ===== */
 .caption-container {
     position: fixed;
     bottom: 0;
-    left: 0;
-    right: 0;
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(10px);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    transition: all 0.3s ease;
+    left: 12px;
+    right: 12px;
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 28px 28px 0 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 20;
-    max-height: 150px;
-    /* 手機瀏覽器底部安全區域 */
+    max-height: 160px;
     padding-bottom: env(safe-area-inset-bottom);
+    box-shadow:
+        0 -12px 48px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
+/* 頂部光效 */
+.caption-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.4) 0%, transparent 100%);
+    border-radius: 28px 28px 0 0;
+    pointer-events: none;
+}
 
 .caption-container.expanded {
     max-height: 100vh;
     height: 100vh;
+    border-radius: 28px 28px 0 0;
 }
 
 .caption-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.5rem 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.5);
+    padding: 0.9rem 1.4rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+    background: transparent;
     position: sticky;
     top: 0;
     z-index: 10;
 }
 
 .caption-header span {
-    font-size: 0.9rem;
-    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.95rem;
+    color: #4a5568;
+    font-weight: 600;
 }
 
 .btn-toggle {
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.6);
+    background: linear-gradient(135deg, rgba(159, 122, 234, 0.2) 0%, rgba(56, 178, 172, 0.2) 100%);
+    border: 1px solid rgba(159, 122, 234, 0.3);
+    color: #6b46c1;
     cursor: pointer;
-    font-size: 0.9rem;
-    padding: 0.3rem 0.8rem;
-    border-radius: 4px;
-    transition: all 0.2s;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.5rem 1.2rem;
+    border-radius: 18px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .btn-toggle:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: linear-gradient(135deg, #9f7aea 0%, #38b2ac 100%);
+    color: white;
+    border-color: transparent;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(159, 122, 234, 0.3);
 }
 
-/* 字幕條 - 顯示最近 3 行 */
+/* ===== 字幕條 ===== */
 .caption-bar {
-    padding: 0.8rem 1rem;
+    padding: 0.9rem 1.4rem;
     max-height: 100px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.6rem;
 }
 
 .caption-item {
-    animation: slideIn 0.3s ease;
-    line-height: 1.4;
+    animation: slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    line-height: 1.6;
+    padding: 0.65rem 0.9rem;
+    background: rgba(255, 255, 255, 0.45);
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 @keyframes slideIn {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(12px) scale(0.95);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
 }
 
 .caption-speaker {
-    color: #60a5fa;
-    font-weight: 600;
-    margin-right: 0.5rem;
+    background: linear-gradient(135deg, #9f7aea 0%, #38b2ac 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
+    margin-right: 0.6rem;
 }
 
 .caption-text {
-    color: #fff;
+    color: #2d3748;
 }
 
-/* 完整字幕 - 展開時全螢幕 */
+/* ===== 完整字幕視圖 ===== */
 .caption-full {
     display: none;
     padding: 1rem;
     padding-bottom: 80px;
-    /* 預留瀏覽器導航列空間 */
     height: calc(100vh - 60px);
     overflow-y: auto;
     overscroll-behavior: contain;
-    /* 防止滚動穿透到後面 */
     -webkit-overflow-scrolling: touch;
-    /* iOS 平滑滚動 */
 }
 
 .caption-container.expanded .caption-bar {
@@ -283,54 +434,69 @@
 .caption-container.expanded .caption-full {
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
+    gap: 1rem;
     touch-action: pan-y;
-    /* 只允許垂直滚動 */
 }
 
 .caption-item-full {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-    padding: 1rem;
-    border-left: 3px solid #60a5fa;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 18px;
+    padding: 1.2rem;
+    border-left: 4px solid transparent;
+    border-image: linear-gradient(180deg, #9f7aea 0%, #38b2ac 100%) 1;
+    box-shadow:
+        0 4px 20px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    transition: all 0.3s ease;
+}
+
+.caption-item-full:hover {
+    transform: translateX(4px);
+    background: rgba(255, 255, 255, 0.6);
 }
 
 .caption-item-full .caption-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.6rem;
     padding: 0;
     border: none;
     background: transparent;
 }
 
 .caption-item-full .caption-speaker {
-    color: #60a5fa;
-    font-weight: 600;
+    background: linear-gradient(135deg, #9f7aea 0%, #38b2ac 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
     font-size: 0.95rem;
 }
 
 .caption-time {
-    color: rgba(255, 255, 255, 0.5);
+    color: #718096;
     font-size: 0.85rem;
+    font-weight: 500;
 }
 
 .caption-item-full .caption-text {
-    color: #fff;
-    line-height: 1.6;
+    color: #2d3748;
+    line-height: 1.7;
 }
 
-/* 響應式設計 */
+/* ===== 響應式設計 ===== */
 @media (max-width: 768px) {
     .meeting-header {
         padding: 0.8rem 1rem;
         padding-top: 1rem;
         flex-wrap: wrap;
-        /* 允許換行 */
         gap: 0.8rem;
+        margin: 0 8px;
+        border-radius: 0 0 22px 22px;
     }
 
-    /* 標題獨立一排 */
     .header-left {
         width: 100%;
         flex: none;
@@ -343,30 +509,25 @@
         font-size: 1rem;
     }
 
-    /* 控制按鈕第二排 */
     .header-right {
         width: 100%;
         display: flex;
         justify-content: flex-start;
         gap: 0.5rem;
+        flex-wrap: wrap;
     }
 
-
-    /* 參與者網格 - 手機優化 */
     .participant-grid {
-        gap: 6px;
-        padding: 6px;
-        /* 預留底部字幕空間 + 瀏覽器導航列 */
-        padding-bottom: calc(150px + 60px);
+        gap: 10px;
+        padding: 4px;
+        padding-bottom: calc(160px + 60px);
     }
 
-    /* 2人時上下排列 */
     .participant-grid[data-count="2"] {
         grid-template-columns: 1fr;
         grid-template-rows: 1fr 1fr;
     }
 
-    /* 3-4人時 2x2 網格 */
     .participant-grid[data-count="3"],
     .participant-grid[data-count="4"] {
         grid-template-columns: repeat(2, 1fr);
@@ -375,12 +536,22 @@
 
     .participant-card {
         min-height: 140px;
+        border-radius: 22px;
     }
 
-    /* 字幕容器 - 手機優化 */
+    .participant-card::before {
+        border-radius: 22px 22px 0 0;
+    }
+
     .caption-container {
-        /* 底部安全區域，避開瀏覽器導航列 */
+        left: 8px;
+        right: 8px;
         bottom: 60px;
+        border-radius: 22px 22px 0 0;
+    }
+
+    .caption-container::before {
+        border-radius: 22px 22px 0 0;
     }
 
     .caption-container.expanded {
@@ -391,7 +562,6 @@
 
     .caption-container.expanded .caption-full {
         height: calc(70vh - 120px);
-        /* 扣除 header 和底部安全區域 */
         padding-bottom: 80px;
     }
 
@@ -399,33 +569,36 @@
         position: sticky;
         top: 0;
         z-index: 100;
-        background: rgba(0, 0, 0, 0.95);
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
     }
 
     .caption-bar {
         max-height: 100px;
         overflow-y: auto;
     }
-
 }
 
-
-
-/* 滾動條 */
+/* ===== 滾動條 ===== */
 ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 10px;
+    height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
+    background: linear-gradient(180deg, rgba(159, 122, 234, 0.5) 0%, rgba(56, 178, 172, 0.5) 100%);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: linear-gradient(180deg, rgba(159, 122, 234, 0.7) 0%, rgba(56, 178, 172, 0.7) 100%);
+    background-clip: padding-box;
 }

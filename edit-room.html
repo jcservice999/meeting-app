@@ -7,47 +7,75 @@
     <title>編輯會議室</title>
     <link rel="stylesheet" href="styles/common.css">
     <style>
+        body {
+            background: linear-gradient(160deg, #f0ebe3 0%, #e8e2d9 25%, #ddd6cc 50%, #d8d0c5 75%, #d0c8bc 100%);
+            min-height: 100vh;
+        }
+
         .edit-room-container {
-            max-width: 600px;
+            max-width: 620px;
             margin: 2rem auto;
-            padding: 2rem;
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            box-shadow: var(--shadow-lg);
+            padding: 2.5rem;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(28px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 32px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            position: relative;
+            z-index: 1;
+        }
+
+        .edit-room-container h1 {
+            background: linear-gradient(135deg, #9f7aea 0%, #38b2ac 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+            margin-bottom: 2rem;
         }
 
         .form-group {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.8rem;
         }
 
         .form-group label {
             display: block;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.6rem;
             font-weight: 600;
-            color: var(--text-primary);
+            color: #2d3748;
         }
 
         .form-group input,
         .form-group textarea {
             width: 100%;
-            padding: 0.75rem;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
+            padding: 0.9rem 1.2rem;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(8px);
+            color: #2d3748;
             font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #9f7aea;
+            background: rgba(255, 255, 255, 0.7);
+            box-shadow: 0 0 0 4px rgba(159, 122, 234, 0.15);
         }
 
         .form-group textarea {
             min-height: 150px;
-            font-family: monospace;
+            font-family: 'Monaco', 'Consolas', monospace;
             resize: vertical;
         }
 
         .help-text {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-top: 0.25rem;
+            font-size: 0.9rem;
+            color: #718096;
+            margin-top: 0.5rem;
         }
 
         .button-group {
@@ -58,37 +86,42 @@
 
         .btn {
             flex: 1;
-            padding: 0.75rem 1.5rem;
+            padding: 0.9rem 1.8rem;
             border: none;
-            border-radius: 8px;
+            border-radius: 50px;
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         .btn-primary {
-            background: var(--primary-color);
+            background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
             color: white;
+            box-shadow: 0 4px 20px rgba(159, 122, 234, 0.35);
         }
 
         .btn-primary:hover {
-            background: var(--primary-dark);
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 32px rgba(159, 122, 234, 0.45);
         }
 
         .btn-secondary {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.6);
+            color: #4a5568;
+            border: 1px solid rgba(255, 255, 255, 0.5);
         }
 
         .btn-secondary:hover {
-            background: var(--border-color);
+            background: rgba(255, 255, 255, 0.8);
+            transform: translateY(-3px);
         }
 
         .current-emails {
-            background: var(--bg-tertiary);
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(12px);
             padding: 1rem;
-            border-radius: 8px;
+            border-radius: 14px;
             margin-bottom: 1rem;
         }
 
@@ -96,12 +129,14 @@
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            background: var(--primary-color);
+            background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
             color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 4px;
+            padding: 0.35rem 0.9rem;
+            border-radius: 50px;
             margin: 0.25rem;
             font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(159, 122, 234, 0.3);
         }
 
         .email-tag button {
