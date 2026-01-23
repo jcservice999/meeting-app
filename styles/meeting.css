@@ -383,12 +383,12 @@
 
 .caption-item {
     animation: slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    line-height: 1.6;
-    padding: 0.65rem 0.9rem;
-    background: rgba(255, 255, 255, 0.45);
+    line-height: 1.7;
+    padding: 0.7rem 1rem;
+    background: rgba(255, 255, 255, 0.55);
     border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
 }
 
 @keyframes slideIn {
@@ -404,16 +404,21 @@
 }
 
 .caption-speaker {
-    background: linear-gradient(135deg, #9f7aea 0%, #38b2ac 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    background: linear-gradient(135deg, #805ad5 0%, #667eea 100%);
+    color: white;
     font-weight: 700;
-    margin-right: 0.6rem;
+    font-size: 0.85rem;
+    padding: 0.25rem 0.7rem;
+    border-radius: 6px;
+    margin-right: 0.5rem;
+    display: inline-block;
+    box-shadow: 0 2px 6px rgba(128, 90, 213, 0.3);
 }
 
 .caption-text {
-    color: #2d3748;
+    color: #1a202c;
+    font-weight: 600;
+    font-size: 0.95rem;
 }
 
 /* ===== 完整字幕視圖 ===== */
@@ -439,16 +444,16 @@
 }
 
 .caption-item-full {
-    background: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.65);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-radius: 18px;
     padding: 1.2rem;
     border-left: 4px solid transparent;
-    border-image: linear-gradient(180deg, #9f7aea 0%, #38b2ac 100%) 1;
+    border-image: linear-gradient(180deg, #805ad5 0%, #667eea 100%) 1;
     box-shadow:
-        0 4px 20px rgba(0, 0, 0, 0.06),
-        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        0 4px 20px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
     transition: all 0.3s ease;
 }
 
@@ -467,12 +472,14 @@
 }
 
 .caption-item-full .caption-speaker {
-    background: linear-gradient(135deg, #9f7aea 0%, #38b2ac 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    background: linear-gradient(135deg, #805ad5 0%, #667eea 100%);
+    color: white;
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 8px;
+    display: inline-block;
+    box-shadow: 0 2px 8px rgba(128, 90, 213, 0.35);
 }
 
 .caption-time {
@@ -482,8 +489,10 @@
 }
 
 .caption-item-full .caption-text {
-    color: #2d3748;
+    color: #1a202c;
     line-height: 1.7;
+    font-weight: 600;
+    font-size: 1rem;
 }
 
 /* ===== 響應式設計 ===== */
@@ -546,8 +555,9 @@
     .caption-container {
         left: 8px;
         right: 8px;
-        bottom: 60px;
+        bottom: 0;
         border-radius: 22px 22px 0 0;
+        padding-bottom: 0;
     }
 
     .caption-container::before {
@@ -555,9 +565,9 @@
     }
 
     .caption-container.expanded {
-        max-height: calc(70vh - 60px);
-        height: calc(70vh - 60px);
-        bottom: 60px;
+        max-height: calc(70vh);
+        height: calc(70vh);
+        bottom: 0;
     }
 
     .caption-container.expanded .caption-full {
