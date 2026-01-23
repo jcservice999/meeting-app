@@ -164,7 +164,7 @@
 
         <div class="form-group">
             <label>會議室名稱</label>
-            <input type="text" id="roomName" readonly>
+            <input type="text" id="roomName" placeholder="輸入會議室名稱">
         </div>
 
         <div class="form-group">
@@ -387,7 +387,7 @@
                     if (emailError) throw emailError;
                 }
 
-                // 2. 處理 Word Boost 關鍵詞
+                // 2. 處理 Word Boost 關鍵詞 + 更新房間名稱
                 const wordBoostText = document.getElementById('wordBoost').value.trim();
                 const wordBoost = wordBoostText
                     .split('\n')
@@ -395,9 +395,18 @@
                     .filter(w => w.length > 0)
                     .slice(0, 100); // 最多 100 個詞
 
+                const newRoomName = document.getElementById('roomName').value.trim();
+                if (!newRoomName) {
+                    alert('請輸入會議室名稱');
+                    return;
+                }
+
                 const { error: boostError } = await supabaseClient
                     .from('rooms')
-                    .update({ word_boost: wordBoost })
+                    .update({
+                        word_boost: wordBoost,
+                        room_name: newRoomName
+                    })
                     .eq('room_id', roomId);
 
                 if (boostError) throw boostError;
