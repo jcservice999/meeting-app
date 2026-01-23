@@ -62,7 +62,13 @@
         <!-- 頂部工具列 -->
         <header class="meeting-header">
             <div class="header-left">
-                <h1>🎤 會議室 (多人模式)</h1>
+                <h1><svg style="width:22px;height:22px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24"
+                        fill="none" stroke="#805ad5" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                        <line x1="12" y1="19" x2="12" y2="23" />
+                        <line x1="8" y1="23" x2="16" y2="23" />
+                    </svg>會議室 (多人模式)</h1>
                 <span id="participantCount" class="participant-count">載入中...</span>
             </div>
             <div class="header-right">
@@ -70,7 +76,11 @@
                     <option value="zh-TW">中文</option>
                     <option value="en-US">English</option>
                 </select>
-                <button id="speakerBtn" class="btn-secondary" title="喇叭">🔊</button>
+                <button id="speakerBtn" class="btn-secondary" title="喇叭"><svg style="width:18px;height:18px;"
+                        viewBox="0 0 24 24" fill="none" stroke="#805ad5" stroke-width="2">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                    </svg></button>
                 <button id="startBtn" class="btn-primary">開始錄音</button>
                 <button id="leaveBtn" class="btn-danger">離開會議</button>
             </div>
@@ -87,7 +97,10 @@
         <!-- 音訊解鎖提示（解決瀏覽器 autoplay 政策） -->
         <div id="audioUnlockOverlay" class="audio-unlock-overlay" style="display: none;">
             <div class="audio-unlock-content">
-                <span style="font-size: 48px;">🔊</span>
+                <svg style="width:48px;height:48px;" viewBox="0 0 24 24" fill="none" stroke="#805ad5" stroke-width="2">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                </svg>
                 <h2>點擊啟用語音通話</h2>
                 <p>瀏覽器需要您的互動才能播放音訊</p>
                 <button id="unlockAudioBtn" class="btn-primary" style="font-size: 18px; padding: 12px 32px;">
@@ -714,12 +727,17 @@
             const micBtn = document.getElementById('micBtn');
             const speakerBtn = document.getElementById('speakerBtn');
 
+            const speakerOnSvg = '<svg style="width:18px;height:18px;" viewBox="0 0 24 24" fill="none" stroke="#805ad5" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
+            const speakerOffSvg = '<svg style="width:18px;height:18px;" viewBox="0 0 24 24" fill="none" stroke="#805ad5" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
+            const micOnSvg = '<svg style="width:18px;height:18px;" viewBox="0 0 24 24" fill="none" stroke="#805ad5" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>';
+            const micOffSvg = '<svg style="width:18px;height:18px;" viewBox="0 0 24 24" fill="none" stroke="#805ad5" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/></svg>';
+
             if (micBtn) {
-                micBtn.textContent = isMicOn ? '🎙️' : '🔇';
+                micBtn.innerHTML = isMicOn ? micOnSvg : micOffSvg;
                 micBtn.style.opacity = isMicOn ? '1' : '0.5';
             }
             if (speakerBtn) {
-                speakerBtn.textContent = isSpeakerOn ? '🔊' : '🔈';
+                speakerBtn.innerHTML = isSpeakerOn ? speakerOnSvg : speakerOffSvg;
                 speakerBtn.style.opacity = isSpeakerOn ? '1' : '0.5';
             }
         }
