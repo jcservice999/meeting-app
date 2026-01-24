@@ -834,7 +834,13 @@
                             roomId: MEETING_ID,
                             wordBoost: roomWordBoost
                         })
-                    }).then(res => res.json()).catch(err => ({ error: 'AssemblyAI 呼叫失敗: ' + err.message }));
+                    }).then(async res => {
+                        if (!res.ok) {
+                            const errText = await res.text().catch(() => 'No body');
+                            throw new Error(`Status ${res.status}: ${errText}`);
+                        }
+                        return res.json();
+                    }).catch(err => ({ error: 'AssemblyAI 呼叫失敗: ' + err.message }));
 
                     // 2. 呼叫 Deepgram (數字輔助)
                     const deepgramRequest = fetch(DEEPGRAM_URL, {
