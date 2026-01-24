@@ -537,7 +537,7 @@
                             roomId: MEETING_ID,
                             wordBoost: roomWordBoost
                         })
-                    }).then(res => res.json());
+                    }).then(res => res.json()).catch(err => ({ error: err.message }));
 
                     // 2. 呼叫 Deepgram (數字輔助)
                     const deepgramRequest = fetch(DEEPGRAM_URL, {
@@ -551,7 +551,7 @@
                             language: language,
                             roomId: MEETING_ID
                         })
-                    }).then(res => res.json());
+                    }).then(res => res.json()).catch(err => ({ error: err.message }));
 
                     // 並行處理
                     const [aaiResult, dgResult] = await Promise.all([assemblyRequest, deepgramRequest]);
@@ -560,21 +560,39 @@
                     console.log('📡 Deepgram:', dgResult);
 
                     // 處理 Deepgram (數字提取)
-                    if (dgResult.transcript) {
+                    if (dgResult && dgResult.transcript) {
                         extractAndShowNumbers(dgResult.transcript);
                     }
 
-                    // 處理 AssemblyAI
-                    if (aaiResult.transcript && aaiResult.transcript.trim()) {
-                        const speakerName = currentUser?.email?.split('@')[0] || '我';
-                        addCaption(speakerName, aaiResult.transcript, true);
+                    // 處理 AssemblyAI (主字幕)
+                    if (aaiResult && aaiResult.transcript && aaiResult.transcript.trim()) {
+                        // 先用 AI 處理標點，再顯示和儲存
+                        const processedText = await addPunctuation(aaiResult.transcript);
+                        showLocalCaption(processedText);
+                        saveCaption(processedText, true); // true = 已處理過
                     }
 
                 } catch (error) {
-                    console.error('API 處理失敗:', error);
+                    console.error('API 處理總體失敗:', error);
                 }
             };
             reader.readAsDataURL(audioBlob);
+        }
+
+        // 提取數字並顯示快照
+        function extractAndShowNumbers(text) {
+            // 匹配阿拉伯數字（包含小數點、百分比、逗號分隔）
+            const numRegex = /\d+([,.]\d+)*%?/g;
+            const matches = text.match(numRegex);
+
+            if (matches && matches.length > 0) {
+                matches.forEach(num => {
+                    // 檢查是否太短（避免誤報）
+                    if (num.length >= 1) {
+                        showDataSnapshot(num, text);
+                    }
+                });
+            }
         }
 
         function stopAssemblyAIBatch() {
@@ -1275,12 +1293,14 @@
             }
         });
 
-        document.getElementById('toggleCaptions').addEventListener('click', () => {
-            const container = document.getElementById('captionContainer');
-            const btn = document.getElementById('toggleCaptions');
-            container.classList.toggle('expanded');
-            btn.textContent = container.classList.contains('expanded') ? '收合 ▼' : '展開 ▲';
-        });
+        const toggleBtn = document.getElementById('toggleExpand');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                const container = document.getElementById('captionContainer');
+                container.classList.toggle('expanded');
+                toggleBtn.textContent = container.classList.contains('expanded') ? '收合完整視圖' : '展開完整視圖';
+            });
+        }
 
         // 頁面關閉時離開會議
         window.addEventListener('beforeunload', () => {
