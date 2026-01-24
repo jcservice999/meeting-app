@@ -270,28 +270,45 @@
                 if (ownerEmails.includes(currentUser.email)) {
                     isOwner = true;
                     console.log('👑 您是此會議室的房主');
-                    // 房主進場即標記為新會話開始時間
+                    // 房主進場
                     sessionStartTime = new Date().toISOString();
-
-                    // 廣播給在場所有人 (雖然剛進房可能沒人，但確保之後加入的人能推導)
+                    // 廣播給所有人
                     broadcastSessionStart(sessionStartTime);
                 } else {
                     isOwner = false;
-                    console.log('👥 您是參與者，嘗試尋找最近的 Session 起點...');
-                    // 如果沒有收到廣播，則預設載入房主最後在線的時間點或最近 1 小時
-                    // 這裡暫時定為 1 小時內，直到收到廣播
-                    const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
-                    sessionStartTime = oneHourAgo;
+                    console.log('👥 您是參與者，正在推導 Session 起點...');
+                    // 先抓取目前在線的人中，房主的狀態
+                    await deriveSessionFromHost();
                 }
 
                 await joinMeeting();
                 await loadParticipants();
                 await loadRecentHistory();
-
             } catch (err) {
                 console.warn('Session 初始化異常', err);
                 await joinMeeting();
                 await loadRecentHistory();
+            }
+        }
+
+        // 從在線房主推導起點 (如果有的話)
+        async function deriveSessionFromHost() {
+            try {
+                // 抓取在線的所有參與者
+                const { data } = await supabaseClient
+                    .from('participants')
+                    .select('user_name, created_at')
+                    .eq('meeting_id', MEETING_ID)
+                    .eq('status', 'online');
+
+                if (data && data.length > 0) {
+                    // 目前簡單化：以列表中最早加入的人的時間作為起點 (通常是房主或 Session 開始者)
+                    const earliest = data.reduce((min, p) =>
+                        new Date(p.created_at) < new Date(min) ? p.created_at : min, data[0].created_at);
+                    sessionStartTime = earliest;
+                }
+            } catch (e) {
+                console.warn('無法推導 Session 起點');
             }
         }
 
@@ -382,59 +399,50 @@
                 .subscribe();
         }
 
-        // 檢查主持人是否在線，不在則踢出所有人
+        // 檢查主持人是否在線
         async function checkHostStatus() {
             try {
-                // 1. 取得房間擁有者 Email
                 const { data: owners } = await supabaseClient
                     .from('room_access')
                     .select('email')
                     .eq('room_id', MEETING_ID);
-
                 const ownerEmails = (owners || []).map(o => o.email);
 
-                // 2. 檢查目前在線的參與者中是否包含擁有者
+                // 抓取在線列表 (只抓必要欄位，防止 400)
                 const { data: onlineList } = await supabaseClient
                     .from('participants')
                     .select('user_name, status')
                     .eq('meeting_id', MEETING_ID)
                     .eq('status', 'online');
 
-                // 比對是否存在持有者 (這需依賴 participants 表中有儲存 email 或 user_id 可比對，現有邏輯是用 user_metadata)
-                // 這裡簡化邏輯：如果一個人都沒有，或者房主不在裡面 (需精確比對)
-                // 更穩定的做法是檢查 room_access 中的建立者在 participants 的對應 ID
+                if (!onlineList || onlineList.length === 0) {
+                    if (!isOwner) triggerHostLeave();
+                    return;
+                }
 
-                const hostGone = await isHostOffline(ownerEmails);
+                // 比對人名 (假設 user_name 包含 email 前綴或者是可辨識的)
+                // 更好的做法是 participants 存 user_id
+                const isHostOnline = onlineList.some(p => {
+                    // 如果 user_name 包含房主 email 的一部分
+                    return ownerEmails.some(email => {
+                        const prefix = email.split('@')[0];
+                        return p.user_name.includes(prefix);
+                    });
+                });
 
-                if (hostGone && !isOwner) {
-                    alert('會議主持人已離開會議室，會議結束。');
-                    window.location.href = 'index.html';
+                if (!isHostOnline && !isOwner) {
+                    triggerHostLeave();
                 }
             } catch (e) {
-                console.warn('檢查主持人狀態失敗', e);
+                console.warn('檢查主機狀態錯誤');
             }
         }
 
-        async function isHostOffline(ownerEmails) {
-            try {
-                const { data } = await supabaseClient
-                    .from('participants')
-                    .select('user_metadata, status')
-                    .eq('meeting_id', MEETING_ID)
-                    .eq('status', 'online');
-
-                if (!data || data.length === 0) return true;
-
-                // 檢查在線列表中是否有任何一位是擁有者
-                const isAnyOwnerOnline = data.some(p => {
-                    const pEmail = p.user_metadata?.email || "";
-                    return ownerEmails.includes(pEmail);
-                });
-
-                return !isAnyOwnerOnline;
-            } catch (e) {
-                return false;
-            }
+        function triggerHostLeave() {
+            setTimeout(() => {
+                alert('會議主持人已離開，會議結束。');
+                window.location.href = 'index.html';
+            }, 1000);
         }
 
         // 訂閱字幕
