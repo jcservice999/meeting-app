@@ -316,9 +316,7 @@
                 const { data, error } = await supabaseClient
                     .from('captions')
                     .select('*')
-                    .eq('meeting_id', currentMeetingId)
-                    .gte('created_at', startDate.toISOString())
-                    .lte('created_at', endDate.toISOString())
+                    .eq('meeting_id', currentMeetingId) // 🟢 精準匹配 Session ID
                     .order('created_at', { ascending: true });
 
                 if (error) throw error;
@@ -436,9 +434,7 @@
                 const { error } = await supabaseClient
                     .from('captions')
                     .delete()
-                    .eq('meeting_id', currentMeetingId)
-                    .gte('created_at', startDate.toISOString())
-                    .lte('created_at', endDate.toISOString());
+                    .eq('meeting_id', currentMeetingId); // 🟢 精準刪除 Session
 
                 if (error) throw error;
 

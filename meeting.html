@@ -574,8 +574,9 @@
                     table: 'captions'
                 }, (payload) => {
                     console.log('📝 收到字幕事件:', payload.new);
-                    // 只顯示當前會議室的字幕，且忽略自己的（避免重複顯示）
-                    if (payload.new.meeting_id === MEETING_ID &&
+                    // 只顯示當前會議室當前 Session 的字幕，且忽略自己的（避免重複顯示）
+                    const sessionTaggedId = MEETING_ID + ':::' + sessionStartTime;
+                    if (payload.new.meeting_id === sessionTaggedId &&
                         payload.new.user_id !== currentUser?.id) {
                         displayRemoteCaption(payload.new);
                     }
@@ -1326,7 +1327,7 @@
             `;
 
             setTimeout(() => {
-                captionBar.scrollTop = captionBar.scrollHeight + 100;
+                scrollToBottom(captionBar, null);
             }, 50);
         }
 
@@ -1380,8 +1381,7 @@
             captionFull.appendChild(captionFullItem);
 
             setTimeout(() => {
-                captionBar.scrollTop = captionBar.scrollHeight + 100;
-                captionFull.scrollTop = captionFull.scrollHeight + 100;
+                scrollToBottom(captionBar, captionFull);
             }, 50);
         }
 
@@ -1480,7 +1480,9 @@
             const interimEl = captionBar.querySelector(`#${interimId}`);
             if (interimEl) interimEl.remove();
 
-            // 如果會議室容器已展開，我們可能不需要更新字幕條？不，為了切換一致，兩邊都更新
+            // 🟢 修復：只顯示最新的一則字幕，插入前直接清空
+            captionBar.innerHTML = '';
+
             const tags = getNumericalTags(caption.text);
             const tagsHtml = tags.length > 0 ?
                 `<div class="caption-tags">${tags.map(t => `<span class="caption-tag">${t}</span>`).join('')}</div>` : '';
@@ -1493,14 +1495,6 @@
                 ${tagsHtml}
             `;
             captionBar.appendChild(captionItem);
-
-            // 嚴格保留最新 3 行
-            const items = captionBar.querySelectorAll('.caption-item:not(.interim-caption)');
-            if (items.length > 3) {
-                for (let i = 0; i < items.length - 3; i++) {
-                    items[i].remove();
-                }
-            }
         }
 
         // --- 完整視圖渲染 (展開視窗) ---

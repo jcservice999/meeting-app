@@ -407,13 +407,14 @@
 
 /* ===== 字幕條 ===== */
 .caption-bar {
-    padding: 1.2rem 1.4rem;
-    max-height: 180px;
-    /* 增加高度，讓使用者可以滑動多行 */
-    overflow-y: auto !important;
+    position: relative;
+    max-height: 220px;
+    overflow: hidden !important;
+    /* 🟢 修復：徹底移除捲動功能，僅呈現最新字幕 */
+    padding: 0.5rem;
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: 0.5rem;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 40px;
     /* 確保收合狀態下最後一筆可拉到底 */
@@ -513,8 +514,8 @@
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     border-radius: 0;
-    position: static !important;
-    /* 🟢 修復：防止繼承 sticky 導致標籤隨捲動位移 */
+    position: relative !important;
+    /* 🟢 修復：確保標頭固定在對話塊上方 */
 }
 
 .caption-item-full .caption-speaker {

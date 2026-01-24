@@ -255,7 +255,7 @@
 
                     return `
                         <div class="meeting-card">
-                            <div class="meeting-content" onclick="viewMeeting('${meeting.meetingId}', '${meeting.date}')">
+                            <div class="meeting-content" onclick="viewMeeting('${meeting.fullId}', '${meeting.date}')">
                                 <div class="meeting-header">
                                     <div class="meeting-name"><svg style="width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="#805ad5" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>會議 ${meeting.meetingId.substring(0, 8)}...</div>
                                     <div class="meeting-date">${meeting.date}</div>
@@ -267,8 +267,8 @@
                                 </div>
                             </div>
                             <div class="meeting-actions">
-                                <button class="btn btn-view" onclick="viewMeeting('${meeting.meetingId}', '${meeting.date}')"><svg style="width:14px;height:14px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>查看對話</button>
-                                <button class="btn btn-delete" onclick="deleteMeeting('${meeting.meetingId}', '${meeting.date}')"><svg style="width:14px;height:14px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>刪除紀錄</button>
+                                <button class="btn btn-view" onclick="viewMeeting('${meeting.fullId}', '${meeting.date}')"><svg style="width:14px;height:14px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>查看對話</button>
+                                <button class="btn btn-delete" onclick="deleteMeeting('${meeting.fullId}', '${meeting.date}')"><svg style="width:14px;height:14px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>刪除紀錄</button>
                             </div>
                         </div>
                     `;
