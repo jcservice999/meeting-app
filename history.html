@@ -254,7 +254,6 @@
                     const endTime = new Date(meeting.lastTime).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
 
                     return `
-                        <div class="meeting-card">
                             <div class="meeting-content" onclick="viewMeeting('${meeting.fullId}', '${meeting.date}')">
                                 <div class="meeting-header">
                                     <div class="meeting-name"><svg style="width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="#805ad5" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>會議 ${meeting.meetingId.substring(0, 8)}...</div>

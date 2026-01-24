@@ -307,7 +307,6 @@
             infoEl.textContent = `日期：${currentDate}`;
 
             try {
-                // 計算日期範圍
                 const startDate = new Date(currentDate);
                 startDate.setHours(0, 0, 0, 0);
                 const endDate = new Date(currentDate);
@@ -316,7 +315,7 @@
                 const { data, error } = await supabaseClient
                     .from('captions')
                     .select('*')
-                    .eq('meeting_id', currentMeetingId) // 🟢 精準匹配 Session ID
+                    .eq('meeting_id', currentMeetingId)
                     .order('created_at', { ascending: true });
 
                 if (error) throw error;
@@ -425,7 +424,6 @@
             }
 
             try {
-                // 計算日期範圍
                 const startDate = new Date(currentDate);
                 startDate.setHours(0, 0, 0, 0);
                 const endDate = new Date(currentDate);
@@ -434,7 +432,7 @@
                 const { error } = await supabaseClient
                     .from('captions')
                     .delete()
-                    .eq('meeting_id', currentMeetingId); // 🟢 精準刪除 Session
+                    .eq('meeting_id', currentMeetingId);
 
                 if (error) throw error;
 

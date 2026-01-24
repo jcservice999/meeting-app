@@ -1308,27 +1308,21 @@
         // 顯示即時字幕（本地）
         function showInterimCaption(text) {
             const captionBar = document.getElementById('captionBar');
-            // 使用 user_id 來區分不同使用者的即時字幕
             const interimId = `interim-${currentUser.id}`;
-            let interimEl = captionBar.querySelector(`#${interimId}`);
+            // 🟢 修復：徹底清空，只顯示最新的一則
+            captionBar.innerHTML = '';
 
-            if (!interimEl) {
-                interimEl = document.createElement('div');
-                interimEl.id = interimId;
-                interimEl.className = 'caption-item interim-caption';
-                interimEl.style.opacity = '0.5';
-                captionBar.appendChild(interimEl);
-            }
+            const interimEl = document.createElement('div');
+            interimEl.id = interimId;
+            interimEl.className = 'caption-item interim-caption';
+            interimEl.style.opacity = '0.5';
+            captionBar.appendChild(interimEl);
 
             const userName = currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || '我';
             interimEl.innerHTML = `
                 <span class="caption-speaker">${userName}:</span>
                 <span class="caption-text">${escapeHtml(text)}</span>
             `;
-
-            setTimeout(() => {
-                scrollToBottom(captionBar, null);
-            }, 50);
         }
 
         // 立即顯示本地確定字幕（不等資料庫）
@@ -1336,10 +1330,8 @@
             const captionBar = document.getElementById('captionBar');
             const captionFull = document.getElementById('captionFull');
 
-            // 移除即時字幕
-            const interimId = `interim-${currentUser.id}`;
-            const interimEl = captionBar.querySelector(`#${interimId}`);
-            if (interimEl) interimEl.remove();
+            // 🟢 修復：徹底清空，只顯示最新的一則
+            captionBar.innerHTML = '';
 
             const userName = currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || '我';
             const now = new Date().toLocaleTimeString('zh-TW');
@@ -1351,21 +1343,13 @@
             // 字幕條
             const captionItem = document.createElement('div');
             captionItem.className = 'caption-item';
-            captionItem.style.opacity = '0.7';
+            captionItem.style.opacity = '0.9'; // 提高一點透明度
             captionItem.innerHTML = `
                 <span class="caption-speaker">${userName}:</span>
                 <span class="caption-text">${escapeHtml(text)}</span>
                 ${tagsHtml}
             `;
             captionBar.appendChild(captionItem);
-
-            // 只保留最近 3 行
-            const items = captionBar.querySelectorAll('.caption-item:not(.interim-caption)');
-            if (items.length > 3) {
-                for (let i = 0; i < items.length - 3; i++) {
-                    items[i].remove();
-                }
-            }
 
             // 完整字幕
             const captionFullItem = document.createElement('div');
@@ -1381,7 +1365,7 @@
             captionFull.appendChild(captionFullItem);
 
             setTimeout(() => {
-                scrollToBottom(captionBar, captionFull);
+                scrollToBottom(null, captionFull); // 🟢 僅對展開視圖進行捲動
             }, 50);
         }
 

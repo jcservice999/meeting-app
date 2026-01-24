@@ -408,16 +408,16 @@
 /* ===== 字幕條 ===== */
 .caption-bar {
     position: relative;
-    max-height: 220px;
+    max-height: 160px;
+    /* 縮小一點高度 */
     overflow: hidden !important;
-    /* 🟢 修復：徹底移除捲動功能，僅呈現最新字幕 */
+    /* 🟢 徹底金身：只顯示最新，不准捲動 */
     padding: 0.5rem;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    justify-content: flex-end;
+    /* 🟢 讓內容靠底部對齊，確保最新顯示在視覺最顯眼處 */
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 40px;
-    /* 確保收合狀態下最後一筆可拉到底 */
 }
 
 .caption-item {
