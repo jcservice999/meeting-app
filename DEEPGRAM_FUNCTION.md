@@ -102,7 +102,9 @@ serve(async (req) => {
       language: language === "zh-TW" ? "zh-TW" : "en",
       punctuate: "true",
       numbers: "true",      // 強制數字化
-      dictation: "true",    // 聽寫模式（對數字更敏感）
+      dictation: "true",    // 聽寫模式
+      smart_format: "true", // 格式化小數點與貨幣
+      filler_words: "true", // 保留贅詞有助於捕捉快速讀出的點與零
       no_delay: "true",
     });
 

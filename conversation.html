@@ -182,6 +182,25 @@
             padding: 2rem;
             color: #718096;
         }
+
+        /* ===== 數據標籤樣式 ===== */
+        .caption-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+
+        .caption-tag {
+            background: rgba(56, 178, 172, 0.1);
+            color: #319795;
+            border: 1px solid rgba(56, 178, 172, 0.3);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: help;
+        }
     </style>
 </head>
 
@@ -246,6 +265,27 @@
         let currentMeetingId = '';
         let currentDate = '';
 
+        // 數據提取邏輯 (與 meeting.html 同步)
+        function getNumericalTags(text) {
+            if (!text) return [];
+            // 匹配數字以及可能前後跟隨的單位
+            // 1. 帶單位的數字 (如 $50, 0.75美金, 100%, 60次)
+            const unitRegex = /(?:[$¥€]|美金|英鎊|歐元|次|個|台幣|HKD|USD)?\s*\d+(?:[.]\d+)*\s*(?:[%$¥€\u4e00-\u9fa5A-Z]{1,4})?/gi;
+            // 2. 小數 (如 0.000075, .000075)
+            const decimalRegex = /[0-9]*[.][0-9]+/g;
+
+            let matches = text.match(unitRegex) || [];
+            const decimals = text.match(decimalRegex) || [];
+            matches = [...new Set([...matches, ...decimals])];
+
+            return matches.map(m => m.trim()).filter(m => {
+                const hasUnit = /[$¥€%次個\u4e00-\u9fa5A-Z]/.test(m);
+                const hasDot = /[.]/.test(m);
+                const isLongNum = m.replace(/[^0-9]/g, '').length >= 3;
+                return hasUnit || hasDot || isLongNum;
+            });
+        }
+
         async function loadConversation() {
             const urlParams = new URLSearchParams(window.location.search);
             currentMeetingId = urlParams.get('meeting');
@@ -295,6 +335,10 @@
                         second: '2-digit'
                     });
 
+                    const tags = getNumericalTags(caption.text);
+                    const tagsHtml = tags.length > 0 ?
+                        `<div class="caption-tags">${tags.map(t => `<span class="caption-tag">${t}</span>`).join('')}</div>` : '';
+
                     return `
                         <div class="message">
                             <div class="message-header">
@@ -302,6 +346,7 @@
                                 <span class="message-time">${time}</span>
                             </div>
                             <div class="message-text">${caption.text || ''}</div>
+                            ${tagsHtml}
                         </div>
                     `;
                 }).join('');

@@ -300,17 +300,21 @@
         // 已移除舊有的全局 showDataSnapshot 函數
         function getNumericalTags(text) {
             if (!text) return [];
-            // 匹配數字以及可能跟隨的單位
-            const numRegex = /\d+([,.]\d+)*\s*[%$¥€\u4e00-\u9fa5A-Z]{1,4}/gi;
-            const fallbackRegex = /\d+([,.]\d+){1,}/g; // 長度大於 1 的純小數/大數
+            // 匹配數字以及可能前後跟隨的單位
+            // 1. 帶單位的數字 (如 $50, 0.75美金, 100%, 60次)
+            const unitRegex = /(?:[$¥€]|美金|英鎊|歐元|次|個|台幣|HKD|USD)?\s*\d+(?:[.]\d+)*\s*(?:[%$¥€\u4e00-\u9fa5A-Z]{1,4})?/gi;
+            // 2. 小數 (如 0.000075, .000075)
+            const decimalRegex = /[0-9]*[.][0-9]+/g;
 
-            let matches = text.match(numRegex) || [];
-            const fallbacks = text.match(fallbackRegex) || [];
-            matches = [...new Set([...matches, ...fallbacks])];
+            let matches = text.match(unitRegex) || [];
+            const decimals = text.match(decimalRegex) || [];
+            matches = [...new Set([...matches, ...decimals])];
 
             return matches.map(m => m.trim()).filter(m => {
-                const hasUnit = /[%$¥€\u4e00-\u9fa5A-Z]/.test(m);
-                return hasUnit || m.length >= 3;
+                const hasUnit = /[$¥€%次個\u4e00-\u9fa5A-Z]/.test(m);
+                const hasDot = /[.]/.test(m);
+                const isLongNum = m.replace(/[^0-9]/g, '').length >= 3;
+                return hasUnit || hasDot || isLongNum;
             });
         }
 
@@ -318,7 +322,8 @@
         function addCaption(speaker, text, isFinal = true) {
             console.log('🔄 呼叫相容層 addCaption:', speaker, text);
             if (isFinal) {
-                showLocalCaption(text);
+                const tags = getNumericalTags(text);
+                showLocalCaption(text, tags);
                 saveCaption(text, true);
             } else {
                 showInterimCaption(text);
