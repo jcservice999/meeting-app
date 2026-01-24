@@ -380,48 +380,29 @@
     box-shadow: 0 4px 16px rgba(159, 122, 234, 0.3);
 }
 
-/* ===== 數據快照 (Deepgram 輔助) ===== */
-.snapshot-container {
-    padding: 0.5rem 1.4rem;
+/* ===== 每條字幕內的數據標籤 ===== */
+.caption-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    min-height: 20px;
-    pointer-events: none;
-    /* 避免干擾點擊 */
+    gap: 4px;
+    margin-top: 6px;
 }
 
-.snapshot-bubble {
-    pointer-events: auto;
-    background: linear-gradient(135deg, #38b2ac 0%, #319795 100%);
-    color: white;
-    padding: 0.3rem 1rem;
-    border-radius: 50px;
-    font-size: 0.85rem;
+.caption-tag {
+    background: rgba(56, 178, 172, 0.1);
+    color: #319795;
+    border: 1px solid rgba(56, 178, 172, 0.3);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
     font-weight: 700;
-    box-shadow: 0 4px 12px rgba(56, 178, 172, 0.3);
-    display: flex;
-    align-items: center;
-    animation: snapshotPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    white-space: nowrap;
+    cursor: help;
+    transition: all 0.2s;
 }
 
-@keyframes snapshotPop {
-    0% {
-        opacity: 0;
-        transform: translateY(10px) scale(0.8);
-    }
-
-    100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
-.snapshot-bubble.fade-out {
-    opacity: 0;
-    transform: scale(0.9);
-    transition: all 0.5s ease;
+.caption-tag:hover {
+    background: #319795;
+    color: white;
 }
 
 /* ===== 字幕條 ===== */

@@ -96,8 +96,17 @@ serve(async (req) => {
     console.log(`Using Deepgram account: ${accountId} (Provider: ${accounts[0].provider})`);
 
     // 呼叫 Deepgram API
-    // 使用 Nova-2 模型並開啟 smart_format
-    const url = `https://api.deepgram.com/v1/listen?model=nova-2&language=${language === "zh-TW" ? "zh-TW" : "en"}&smart_format=true&punctuate=true`;
+    // 優化數字辨識參數：numbers=true 與 dictation=true 對數字極其敏感
+    const params = new URLSearchParams({
+      model: "nova-2",
+      language: language === "zh-TW" ? "zh-TW" : "en",
+      punctuate: "true",
+      numbers: "true",      // 強制數字化
+      dictation: "true",    // 聽寫模式（對數字更敏感）
+      no_delay: "true",
+    });
+
+    const url = `https://api.deepgram.com/v1/listen?${params.toString()}`;
     
     const binaryAudio = Uint8Array.from(atob(audio), c => c.charCodeAt(0));
 

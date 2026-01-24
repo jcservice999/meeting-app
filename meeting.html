@@ -115,7 +115,6 @@
                 <span>即時字幕與數據</span>
                 <button id="toggleExpand" class="btn-toggle">展開完整視圖</button>
             </div>
-            <div id="snapshotContainer" class="snapshot-container"></div>
             <div class="caption-bar" id="captionBar">
                 <!-- 字幕項目將會在這裡動態新增 -->
             </div>
@@ -298,30 +297,21 @@
                 });
         }
 
-        function showDataSnapshot(number, context) {
-            console.log('💎 偵測到關鍵數據:', number);
-            const container = document.getElementById('snapshotContainer');
-            if (!container) return;
+        // 已移除舊有的全局 showDataSnapshot 函數
+        function getNumericalTags(text) {
+            if (!text) return [];
+            // 匹配數字以及可能跟隨的單位
+            const numRegex = /\d+([,.]\d+)*\s*[%$¥€\u4e00-\u9fa5A-Z]{1,4}/gi;
+            const fallbackRegex = /\d+([,.]\d+){1,}/g; // 長度大於 1 的純小數/大數
 
-            // 建立氣泡
-            const bubble = document.createElement('div');
-            bubble.className = 'snapshot-bubble';
-            bubble.textContent = number;
-            bubble.title = `語境："${context}"`;
+            let matches = text.match(numRegex) || [];
+            const fallbacks = text.match(fallbackRegex) || [];
+            matches = [...new Set([...matches, ...fallbacks])];
 
-            // 加入容器
-            container.appendChild(bubble);
-
-            // 15 秒後移除
-            setTimeout(() => {
-                bubble.classList.add('fade-out');
-                setTimeout(() => bubble.remove(), 500);
-            }, 15000);
-
-            // 限制數量，避免過多
-            if (container.children.length > 5) {
-                container.removeChild(container.firstChild);
-            }
+            return matches.map(m => m.trim()).filter(m => {
+                const hasUnit = /[%$¥€\u4e00-\u9fa5A-Z]/.test(m);
+                return hasUnit || m.length >= 3;
+            });
         }
 
         // --- 相容性補丁：避免舊程式碼呼叫 addCaption 導致崩潰 ---
@@ -577,14 +567,15 @@
                     else console.log('📝 AssemblyAI 辨識成功:', aaiResult.transcript);
 
                     // 處理 Deepgram (數字提取)
+                    let numericalTags = [];
                     if (dgResult && dgResult.transcript) {
-                        extractAndShowNumbers(dgResult.transcript);
+                        numericalTags = getNumericalTags(dgResult.transcript);
                     }
 
                     // 處理 AssemblyAI (主字幕)
                     if (aaiResult && aaiResult.transcript && aaiResult.transcript.trim()) {
                         const processedText = await addPunctuation(aaiResult.transcript);
-                        showLocalCaption(processedText);
+                        showLocalCaption(processedText, numericalTags);
                         saveCaption(processedText, true);
                     }
 
@@ -597,27 +588,7 @@
 
         // 提取數字並顯示快照
         function extractAndShowNumbers(text) {
-            // 匹配數字以及可能跟隨的單位（中文、英文、百分比、貨幣符號）
-            // 例如：0.75美金, 60次, 100%, $50
-            const numRegex = /\d+([,.]\d+)*\s*[%$¥€\u4e00-\u9fa5A-Z]{1,4}/gi;
-            const fallbackRegex = /\d+([,.]\d+){1,}/g; // 長度大於 1 的純小數/大數
-
-            let matches = text.match(numRegex) || [];
-            const fallbacks = text.match(fallbackRegex) || [];
-            matches = [...new Set([...matches, ...fallbacks])];
-
-            if (matches && matches.length > 0) {
-                matches.forEach(match => {
-                    const trimmed = match.trim();
-                    // 過濾：排除太短的純整數（如 '1', '6'）除非它們帶有單位
-                    const hasUnit = /[%$¥€\u4e00-\u9fa5A-Z]/.test(trimmed);
-                    const isLongNum = trimmed.length >= 3;
-
-                    if (hasUnit || isLongNum) {
-                        showDataSnapshot(trimmed, text);
-                    }
-                });
-            }
+            // 這個函數已棄用，數字標籤現在直接銜接在字幕內容中。
         }
 
         function stopAssemblyAIBatch() {
@@ -1039,7 +1010,7 @@
         }
 
         // 立即顯示本地確定字幕（不等資料庫）
-        function showLocalCaption(text) {
+        function showLocalCaption(text, tags = []) {
             const captionBar = document.getElementById('captionBar');
             const captionFull = document.getElementById('captionFull');
 
@@ -1051,13 +1022,18 @@
             const userName = currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || '我';
             const now = new Date().toLocaleTimeString('zh-TW');
 
-            // 字幕條：只保留最近 3 行
+            // 產生標籤 HTML
+            const tagsHtml = tags.length > 0 ?
+                `<div class="caption-tags">${tags.map(t => `<span class="caption-tag" title="Deepgram 偵測到的數據">${t}</span>`).join('')}</div>` : '';
+
+            // 字幕條
             const captionItem = document.createElement('div');
             captionItem.className = 'caption-item';
             captionItem.style.opacity = '0.7';
             captionItem.innerHTML = `
                 <span class="caption-speaker">${userName}:</span>
                 <span class="caption-text">${escapeHtml(text)}</span>
+                ${tagsHtml}
             `;
             captionBar.appendChild(captionItem);
 
@@ -1069,16 +1045,16 @@
                 }
             }
 
-            // 完整字幕：保留所有
+            // 完整字幕
             const captionFullItem = document.createElement('div');
             captionFullItem.className = 'caption-item-full';
-            captionFullItem.style.opacity = '0.7';
             captionFullItem.innerHTML = `
                 <div class="caption-header">
                     <span class="caption-speaker">${userName}</span>
                     <span class="caption-time">${now}</span>
                 </div>
                 <div class="caption-text">${escapeHtml(text)}</div>
+                ${tagsHtml}
             `;
             captionFull.appendChild(captionFullItem);
 
