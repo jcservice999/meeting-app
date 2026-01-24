@@ -513,6 +513,8 @@
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     border-radius: 0;
+    position: static !important;
+    /* 🟢 修復：防止繼承 sticky 導致標籤隨捲動位移 */
 }
 
 .caption-item-full .caption-speaker {

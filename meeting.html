@@ -394,7 +394,7 @@
 
                 if (isOwner) {
                     console.log('👑 您是此會議室的真正房主');
-                    sessionStartTime = new Date().toISOString();
+                    // sessionStartTime = new Date().toISOString(); // 🔴 移除：避免重新整理時重置會話起點
                     // 廣播與 Presence 更新
                     broadcastSessionStart(sessionStartTime);
                 } else {
@@ -477,7 +477,6 @@
                     .from('captions')
                     .select('*')
                     .eq('meeting_id', MEETING_ID)
-                    .gte('created_at', sessionStartTime)
                     .order('created_at', { ascending: true });
 
                 if (error) throw error;
