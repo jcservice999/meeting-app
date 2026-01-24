@@ -868,40 +868,9 @@
                     const tagsFromAai = getNumericalTags(aaiText);
                     const numericalTags = [...new Set([...tagsFromDg, ...tagsFromAai])];
 
-                    // 處理顯示與儲存 (整合兩邊結果提升精準度)
                     if (aaiText || dgText) {
-                        let processedText = aaiText.trim();
-
-                        // 雙 AI 數字校正邏輯：
-                        // 如果 Deepgram 偵測到數字，而 AAI 提供的是中文描述或可能不精準
-                        // 我們發送給 AI 進行交叉比對修正
-                        if (numericalTags.length > 0) {
-                            try {
-                                const response = await fetch(PUNCTUATION_API_URL, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-                                    },
-                                    body: JSON.stringify({
-                                        mode: 'correction', // 特殊模式：數字校正
-                                        aaiTranscript: aaiText,
-                                        dgTranscript: dgText,
-                                        tags: numericalTags
-                                    })
-                                });
-                                if (response.ok) {
-                                    const data = await response.json();
-                                    processedText = data.text || processedText;
-                                    console.log('💎 雙 AI 數字校正後:', processedText);
-                                }
-                            } catch (e) {
-                                console.warn('數字校正失敗，回退至標點處理');
-                                processedText = await addPunctuation(processedText || dgText);
-                            }
-                        } else {
-                            processedText = await addPunctuation(processedText || dgText);
-                        }
+                        // 使用現有的加標點功能
+                        let processedText = await addPunctuation(aaiText || dgText);
 
                         if (processedText) {
                             showLocalCaption(processedText, numericalTags);
