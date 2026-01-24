@@ -158,6 +158,7 @@
         let captionsChannel = null;
         let roomWordBoost = []; // Word Boost 關鍵詞
         let isOwner = false; // 是否為房主 (創立者)
+        let sessionStartTime = new Date().toISOString(); // 本次 Session 起點時間
 
 
         // 檢查房間存取權限
@@ -221,7 +222,7 @@
             await loadRoomWordBoost();
         });
 
-        // 處理房主 Session：如果是房主，則清空舊紀錄；如果不是，則載入歷史
+        // 處理房主 Session：如果是房主，則重置 Session 起點；如果不是，則載入歷史
         async function handleOwnerSession() {
             try {
                 // 檢查房間權限
@@ -234,22 +235,33 @@
                     .select('email')
                     .eq('room_id', MEETING_ID);
 
-                // 只要目前的 email 是清單中的其中一個 (通常第一個是建立者)，我們就視為有管理權限
+                // 取得擁有者名單
                 const ownerEmails = data ? data.map(item => item.email) : [];
 
                 if (!error && ownerEmails.includes(currentUser.email)) {
                     isOwner = true;
-                    console.log('👑 您是此會議室的房主，正在為您重置對話 Session...');
-                    // 房主進來：清空舊紀錄，當作新開始
-                    await clearMeetingHistory();
+                    console.log('👑 您是此會議室的房主，正在更新 Session 起點...');
+                    // 更新房間的最後重置時間，作為當前 Session 的開始
+                    sessionStartTime = new Date().toISOString();
+                    await updateRoomResetTime(sessionStartTime);
                 } else {
                     isOwner = false;
-                    console.log('👥 您是參與者，正在載入今日歷史對話...');
-                    // 一般參與者進來：載入紀錄保持同步
+                    console.log('👥 您是參與者，正在取得房主設定的 Session 起點...');
+                    // 非房主進來：取得該房間最後一次重置的時間
+                    const { data: roomData } = await supabaseClient
+                        .from('rooms')
+                        .select('last_reset_at')
+                        .eq('room_id', MEETING_ID)
+                        .single();
+
+                    if (roomData && roomData.last_reset_at) {
+                        sessionStartTime = roomData.last_reset_at;
+                    }
+                    // 根據起點載入紀錄
                     await loadRecentHistory();
                 }
 
-                // --- 補回所有必要的初始化呼叫 ---
+                // --- 所有必要的初始化呼叫 ---
                 await joinMeeting(); // 加入會議室 (participants 表格)
                 subscribeToParticipants(); // 訂閱參與者
                 subscribeToCaptions(); // 訂閱字幕
@@ -258,7 +270,6 @@
 
             } catch (err) {
                 console.warn('Session 處理失敗', err);
-                // 失敗時也嘗試基本初始化
                 await joinMeeting();
                 subscribeToParticipants();
                 subscribeToCaptions();
@@ -267,47 +278,47 @@
             }
         }
 
-        // 清空該房間的歷史對話
-        async function clearMeetingHistory() {
+        // 更新房間的重置時間 (不刪除任何數據)
+        async function updateRoomResetTime(timestamp) {
             try {
                 const { error } = await supabaseClient
-                    .from('captions')
-                    .delete()
-                    .eq('meeting_id', MEETING_ID);
+                    .from('rooms')
+                    .update({ last_reset_at: timestamp })
+                    .eq('room_id', MEETING_ID);
 
                 if (error) throw error;
-                console.log('🧹 歷史紀錄已清除，新 Session 開始');
+                console.log('🕒 會議起點已同步:', timestamp);
             } catch (err) {
-                console.error('清除歷史紀錄失敗:', err);
+                console.error('更新重置時間失敗:', err);
             }
         }
 
-        // 載入最近的對話紀錄
-        async function loadRecentHistory() {
-            console.log('📜 正在載入最近的對話紀錄...');
-            try {
-                // 獲取今天凌晨的時間，作為對話的起點
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
+        // 清空視圖指令轉發 (不再物理刪除)
+        async function clearMeetingHistory() {
+            console.log('🚫 物理刪除功能已停用，紀錄保存在資料庫中');
+        }
 
+        // 載入當前 Session 的對話紀錄
+        async function loadRecentHistory() {
+            console.log('📜 正在載入 Session 起點以後的紀錄...', sessionStartTime);
+            try {
                 const { data, error } = await supabaseClient
                     .from('captions')
                     .select('*')
                     .eq('meeting_id', MEETING_ID)
-                    .gte('created_at', today.toISOString())
+                    .gte('created_at', sessionStartTime)
                     .order('created_at', { ascending: true });
 
                 if (error) throw error;
 
                 if (data && data.length > 0) {
-                    console.log(`✅ 已載入 ${data.length} 條對話紀錄`);
+                    console.log(`✅ 已載入 ${data.length} 條 Live 對話`);
                     data.forEach(caption => {
-                        // 統一使用遠端字幕渲染邏輯
-                        displayRemoteCaption(caption, false); // false 代表不要彈跳動畫或強制提示
+                        displayRemoteCaption(caption, false);
                     });
                 }
             } catch (err) {
-                console.error('載入歷史紀錄失敗:', err);
+                console.error('載入紀錄失敗:', err);
             }
         }
 
@@ -334,7 +345,7 @@
             }
         }
 
-        // 訂閱參與者變化
+        // 訂閱參與者變化 (包含踢人機制)
         function subscribeToParticipants() {
             participantsChannel = supabaseClient
                 .channel('participants-changes')
@@ -343,11 +354,69 @@
                     schema: 'public',
                     table: 'participants',
                     filter: `meeting_id=eq.${MEETING_ID}`
-                }, (payload) => {
+                }, async (payload) => {
                     console.log('參與者變化:', payload);
+
+                    // 檢查主持人狀態
+                    if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+                        await checkHostStatus();
+                    }
+
                     loadParticipants();
                 })
                 .subscribe();
+        }
+
+        // 檢查主持人是否在線，不在則踢出所有人
+        async function checkHostStatus() {
+            try {
+                // 1. 取得房間擁有者 Email
+                const { data: owners } = await supabaseClient
+                    .from('room_access')
+                    .select('email')
+                    .eq('room_id', MEETING_ID);
+
+                const ownerEmails = (owners || []).map(o => o.email);
+
+                // 2. 檢查目前在線的參與者中是否包含擁有者
+                const { data: onlineList } = await supabaseClient
+                    .from('participants')
+                    .select('user_name, status')
+                    .eq('meeting_id', MEETING_ID)
+                    .eq('status', 'online');
+
+                // 比對是否存在持有者 (這需依賴 participants 表中有儲存 email 或 user_id 可比對，現有邏輯是用 user_metadata)
+                // 這裡簡化邏輯：如果一個人都沒有，或者房主不在裡面 (需精確比對)
+                // 更穩定的做法是檢查 room_access 中的建立者在 participants 的對應 ID
+
+                const hostGone = await isHostOffline(ownerEmails);
+
+                if (hostGone && !isOwner) {
+                    alert('會議主持人已離開會議室，會議結束。');
+                    window.location.href = 'index.html';
+                }
+            } catch (e) {
+                console.warn('檢查主持人狀態失敗', e);
+            }
+        }
+
+        async function isHostOffline(ownerEmails) {
+            const { data } = await supabaseClient
+                .from('participants')
+                .select('user_metadata, status')
+                .eq('meeting_id', MEETING_ID)
+                .eq('status', 'online');
+
+            if (!data || data.length === 0) return true;
+
+            // 檢查在線列表中是否有任何一位是擁有者
+            const isAnyOwnerOnline = data.some(p => {
+                // 假設 email 存放在 user_metadata 中
+                const pEmail = p.user_metadata?.email || "";
+                return ownerEmails.includes(pEmail);
+            });
+
+            return !isAnyOwnerOwnerOnline;
         }
 
         // 訂閱字幕
@@ -1274,10 +1343,17 @@
 
             // 如果需要滾動
             if (shouldScroll) {
+                // 強制渲染後滾動 (加上較大的位移確保觸底)
+                requestAnimationFrame(() => {
+                    captionBar.scrollTop = captionBar.scrollHeight + 500;
+                    captionFull.scrollTop = captionFull.scrollHeight + 500;
+                });
+
+                // 針對 iOS/Safari 的額外延遲補償
                 setTimeout(() => {
-                    captionBar.scrollTop = captionBar.scrollHeight + 100;
-                    captionFull.scrollTop = captionFull.scrollHeight + 100;
-                }, 50);
+                    captionBar.scrollTop = captionBar.scrollHeight + 500;
+                    captionFull.scrollTop = captionFull.scrollHeight + 500;
+                }, 150);
             }
         }
 
