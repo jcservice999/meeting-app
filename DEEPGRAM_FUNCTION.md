@@ -101,11 +101,12 @@ serve(async (req) => {
       model: "nova-2",
       language: language === "zh-TW" ? "zh-TW" : "en",
       punctuate: "true",
-      numbers: "true",      // 強制數字化
-      dictation: "true",    // 聽寫模式
-      smart_format: "true", // 格式化小數點與貨幣
-      filler_words: "true", // 保留贅詞有助於捕捉快速讀出的點與零
+      numbers: "true",      
+      smart_format: "true", 
+      filler_words: "true", 
       no_delay: "true",
+      // 強制搜尋小數點與零的關鍵音，有助於提高微小數據的觸發率
+      search: "點,零點,0.,.0", 
     });
 
     const url = `https://api.deepgram.com/v1/listen?${params.toString()}`;

@@ -571,15 +571,19 @@
                     if (aaiResult.error) console.error('❌ AssemblyAI 錯誤:', aaiResult.error);
                     else console.log('📝 AssemblyAI 辨識成功:', aaiResult.transcript);
 
-                    // 處理 Deepgram (數字提取)
+                    // 處理數據提取 (整合兩邊結果提升精準度)
                     let numericalTags = [];
-                    if (dgResult && dgResult.transcript) {
-                        numericalTags = getNumericalTags(dgResult.transcript);
-                    }
+                    const dgText = (dgResult && dgResult.transcript) ? dgResult.transcript : "";
+                    const aaiText = (aaiResult && aaiResult.transcript) ? aaiResult.transcript : "";
+
+                    // 從兩個結果中都提取標籤並合併去重
+                    const tagsFromDg = getNumericalTags(dgText);
+                    const tagsFromAai = getNumericalTags(aaiText);
+                    numericalTags = [...new Set([...tagsFromDg, ...tagsFromAai])];
 
                     // 處理 AssemblyAI (主字幕)
-                    if (aaiResult && aaiResult.transcript && aaiResult.transcript.trim()) {
-                        const processedText = await addPunctuation(aaiResult.transcript);
+                    if (aaiText.trim()) {
+                        const processedText = await addPunctuation(aaiText);
                         showLocalCaption(processedText, numericalTags);
                         saveCaption(processedText, true);
                     }
@@ -1011,7 +1015,9 @@
                 <span class="caption-text">${escapeHtml(text)}</span>
             `;
 
-            captionBar.scrollTop = captionBar.scrollHeight;
+            setTimeout(() => {
+                captionBar.scrollTop = captionBar.scrollHeight + 100;
+            }, 50);
         }
 
         // 立即顯示本地確定字幕（不等資料庫）
@@ -1063,8 +1069,10 @@
             `;
             captionFull.appendChild(captionFullItem);
 
-            captionBar.scrollTop = captionBar.scrollHeight;
-            captionFull.scrollTop = captionFull.scrollHeight;
+            setTimeout(() => {
+                captionBar.scrollTop = captionBar.scrollHeight + 100;
+                captionFull.scrollTop = captionFull.scrollHeight + 100;
+            }, 50);
         }
 
         // 使用 OpenRouter AI 添加標點符號和修正錯別字
@@ -1145,12 +1153,18 @@
 
             const now = new Date(caption.created_at).toLocaleTimeString('zh-TW');
 
+            // 產生標籤 HTML (從文字中重新提取)
+            const tags = getNumericalTags(caption.text);
+            const tagsHtml = tags.length > 0 ?
+                `<div class="caption-tags">${tags.map(t => `<span class="caption-tag">${t}</span>`).join('')}</div>` : '';
+
             // 字幕條：只保留最近 3 行
             const captionItem = document.createElement('div');
             captionItem.className = 'caption-item';
             captionItem.innerHTML = `
                 <span class="caption-speaker">${caption.user_name}:</span>
                 <span class="caption-text">${escapeHtml(caption.text)}</span>
+                ${tagsHtml}
             `;
             captionBar.appendChild(captionItem);
 
@@ -1171,11 +1185,15 @@
                     <span class="caption-time">${now}</span>
                 </div>
                 <div class="caption-text">${escapeHtml(caption.text)}</div>
+                ${tagsHtml}
             `;
             captionFull.appendChild(captionFullItem);
 
-            captionBar.scrollTop = captionBar.scrollHeight;
-            captionFull.scrollTop = captionFull.scrollHeight;
+            // 強制捲動到底部 (延遲一下確保 DOM 渲染完成)
+            setTimeout(() => {
+                captionBar.scrollTop = captionBar.scrollHeight + 100;
+                captionFull.scrollTop = captionFull.scrollHeight + 100;
+            }, 50);
         }
 
         // HTML 轉義
