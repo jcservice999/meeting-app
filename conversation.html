@@ -268,19 +268,21 @@
         // 數據提取邏輯 (與 meeting.html 同步)
         function getNumericalTags(text) {
             if (!text) return [];
+
+            // 處理 Deepgram 常見的中文格式化標點
+            const cleanedText = text.replace(/(\d)。(\d)/g, '$1.$2').replace(/(\d)、(\d)/g, '$1,$2');
+
             // 匹配數字以及可能前後跟隨的單位
-            // 1. 帶單位的數字 (如 $50, 0.75美金, 100%, 60次)
-            const unitRegex = /(?:[$¥€]|美金|英鎊|歐元|次|個|台幣|HKD|USD)?\s*\d+(?:[.]\d+)*\s*(?:[%$¥€\u4e00-\u9fa5A-Z]{1,4})?/gi;
-            // 2. 小數 (如 0.000075, .000075)
+            const unitRegex = /(?:[$¥€]|美金|英鎊|歐元|次|個|台幣|HKD|USD)?\s*\d+(?:[.,]\d+)*\s*(?:[%$¥€\u4e00-\u9fa5A-Z]{1,4})?/gi;
             const decimalRegex = /[0-9]*[.][0-9]+/g;
 
-            let matches = text.match(unitRegex) || [];
-            const decimals = text.match(decimalRegex) || [];
+            let matches = cleanedText.match(unitRegex) || [];
+            const decimals = cleanedText.match(decimalRegex) || [];
             matches = [...new Set([...matches, ...decimals])];
 
             return matches.map(m => m.trim()).filter(m => {
                 const hasUnit = /[$¥€%次個\u4e00-\u9fa5A-Z]/.test(m);
-                const hasDot = /[.]/.test(m);
+                const hasDot = /[.,]/.test(m);
                 const isLongNum = m.replace(/[^0-9]/g, '').length >= 3;
                 return hasUnit || hasDot || isLongNum;
             });

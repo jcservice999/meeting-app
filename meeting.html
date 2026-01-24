@@ -232,9 +232,41 @@
             // 載入現有參與者
             await loadParticipants();
 
+            // 載入當前對話紀錄 (供晚進來的人看)
+            await loadRecentHistory();
+
             // 載入 Word Boost 關鍵詞
             await loadRoomWordBoost();
         });
+
+        // 載入最近的對話紀錄
+        async function loadRecentHistory() {
+            console.log('📜 正在載入最近的對話紀錄...');
+            try {
+                // 獲取今天凌晨的時間，作為對話的起點
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                const { data, error } = await supabaseClient
+                    .from('captions')
+                    .select('*')
+                    .eq('meeting_id', MEETING_ID)
+                    .gte('created_at', today.toISOString())
+                    .order('created_at', { ascending: true });
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    console.log(`✅ 已載入 ${data.length} 條對話紀錄`);
+                    data.forEach(caption => {
+                        // 統一使用遠端字幕渲染邏輯
+                        displayRemoteCaption(caption, false); // false 代表不要彈跳動畫或強制提示
+                    });
+                }
+            } catch (err) {
+                console.error('載入歷史紀錄失敗:', err);
+            }
+        }
 
         // 加入會議室
         async function joinMeeting() {
@@ -298,21 +330,25 @@
         }
 
         // 已移除舊有的全局 showDataSnapshot 函數
+        // 已移除舊有的全局 showDataSnapshot 函數
         function getNumericalTags(text) {
             if (!text) return [];
+
+            // 處理 Deepgram 常見的中文格式化標點：
+            // 「。」有時會被誤用為小數點，「、」有時會被誤用為千分位
+            const cleanedText = text.replace(/(\d)。(\d)/g, '$1.$2').replace(/(\d)、(\d)/g, '$1,$2');
+
             // 匹配數字以及可能前後跟隨的單位
-            // 1. 帶單位的數字 (如 $50, 0.75美金, 100%, 60次)
-            const unitRegex = /(?:[$¥€]|美金|英鎊|歐元|次|個|台幣|HKD|USD)?\s*\d+(?:[.]\d+)*\s*(?:[%$¥€\u4e00-\u9fa5A-Z]{1,4})?/gi;
-            // 2. 小數 (如 0.000075, .000075)
+            const unitRegex = /(?:[$¥€]|美金|英鎊|歐元|次|個|台幣|HKD|USD)?\s*\d+(?:[.,]\d+)*\s*(?:[%$¥€\u4e00-\u9fa5A-Z]{1,4})?/gi;
             const decimalRegex = /[0-9]*[.][0-9]+/g;
 
-            let matches = text.match(unitRegex) || [];
-            const decimals = text.match(decimalRegex) || [];
+            let matches = cleanedText.match(unitRegex) || [];
+            const decimals = cleanedText.match(decimalRegex) || [];
             matches = [...new Set([...matches, ...decimals])];
 
             return matches.map(m => m.trim()).filter(m => {
                 const hasUnit = /[$¥€%次個\u4e00-\u9fa5A-Z]/.test(m);
-                const hasDot = /[.]/.test(m);
+                const hasDot = /[.,]/.test(m);
                 const isLongNum = m.replace(/[^0-9]/g, '').length >= 3;
                 return hasUnit || hasDot || isLongNum;
             });
@@ -571,19 +607,15 @@
                     if (aaiResult.error) console.error('❌ AssemblyAI 錯誤:', aaiResult.error);
                     else console.log('📝 AssemblyAI 辨識成功:', aaiResult.transcript);
 
-                    // 處理數據提取 (整合兩邊結果提升精準度)
-                    let numericalTags = [];
-                    const dgText = (dgResult && dgResult.transcript) ? dgResult.transcript : "";
-                    const aaiText = (aaiResult && aaiResult.transcript) ? aaiResult.transcript : "";
+                    // 決定要顯示的文字：優先用 AAI，若 AAI 沒結果但 DG 有數據，則顯示 DG 的結果
+                    let displayText = aaiText.trim();
+                    if (!displayText && numericalTags.length > 0) {
+                        displayText = dgText.trim();
+                    }
 
-                    // 從兩個結果中都提取標籤並合併去重
-                    const tagsFromDg = getNumericalTags(dgText);
-                    const tagsFromAai = getNumericalTags(aaiText);
-                    numericalTags = [...new Set([...tagsFromDg, ...tagsFromAai])];
-
-                    // 處理 AssemblyAI (主字幕)
-                    if (aaiText.trim()) {
-                        const processedText = await addPunctuation(aaiText);
+                    // 處理顯示與儲存
+                    if (displayText) {
+                        const processedText = await addPunctuation(displayText);
                         showLocalCaption(processedText, numericalTags);
                         saveCaption(processedText, true);
                     }
@@ -1142,7 +1174,7 @@
         }
 
         // 顯示遠端字幕
-        function displayRemoteCaption(caption) {
+        function displayRemoteCaption(caption, shouldScroll = true) {
             const captionBar = document.getElementById('captionBar');
             const captionFull = document.getElementById('captionFull');
 
@@ -1189,11 +1221,13 @@
             `;
             captionFull.appendChild(captionFullItem);
 
-            // 強制捲動到底部 (延遲一下確保 DOM 渲染完成)
-            setTimeout(() => {
-                captionBar.scrollTop = captionBar.scrollHeight + 100;
-                captionFull.scrollTop = captionFull.scrollHeight + 100;
-            }, 50);
+            // 如果需要滾動
+            if (shouldScroll) {
+                setTimeout(() => {
+                    captionBar.scrollTop = captionBar.scrollHeight + 100;
+                    captionFull.scrollTop = captionFull.scrollHeight + 100;
+                }, 50);
+            }
         }
 
         // HTML 轉義
