@@ -12,7 +12,8 @@ CREATE TABLE rooms (
   room_name TEXT NOT NULL,
   created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   created_at TIMESTAMP DEFAULT NOW(),
-  is_active BOOLEAN DEFAULT TRUE
+  is_active BOOLEAN DEFAULT TRUE,
+  session_start_time TEXT  -- 🟢 新增：用於防止重新整理頁面後紀錄遺失
 );
 
 -- 啟用 RLS
