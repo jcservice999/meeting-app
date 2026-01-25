@@ -253,7 +253,20 @@
                 })
                 .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
                     console.log('🏃 有人離開了:', leftPresences);
-                    checkHostLeave(leftPresences);
+                    // 🔴 修正：不再根據 Presence 離開事件踢人，以支援重新整理
+                })
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'rooms',
+                    filter: `room_id=eq.${MEETING_ID}`
+                }, (payload) => {
+                    console.log('🏠 房間狀態更新:', payload.new);
+                    // 🔴 關鍵：只有當 is_active 被明確設為 false 時，才清場
+                    if (payload.new.is_active === false) {
+                        console.warn('🚨 房主已關閉會議，執行退場程序');
+                        triggerHostLeave();
+                    }
                 })
                 .on('broadcast', { event: 'new_session' }, (payload) => {
                     console.log('📡 收到房主 Session 指令:', payload);
@@ -322,8 +335,8 @@
             updateParticipantGrid();
             updateParticipantCount();
 
-            // 3. 檢查主持人是否在線
-            checkHostStatus();
+            // 3. 檢查主持人是否在線 (已由 DB 狀態取代引發退場)
+            // checkHostStatus();
         }
 
         // 強制重新載入當前 Session 視圖
@@ -337,23 +350,28 @@
         }
 
         function checkHostLeave(leftUsers) {
+            // 🔴 已由 DB 狀態監聽取代，解決重整誤踢問題
+            /*
             if (isOwner) return;
             const hostLeft = leftUsers.some(u => u.is_host);
             if (hostLeft) {
                 console.log('⚠️ 房主已離開');
                 triggerHostLeave();
             }
+            */
         }
 
-        // 定期檢查 Presence 確保房主還在
+        // 定期檢查 Presence (僅用於名單顯示，已移除踢人邏輯)
         setInterval(() => {
             if (!isOwner && window.roomChannel) {
+                /*
                 const state = window.roomChannel.presenceState();
                 const users = Object.values(state).flat();
                 const hostOnline = users.some(u => u.is_host);
-                if (!hostOnline && users.length > 0) { // 只有在有人的情況下才踢
+                if (!hostOnline && users.length > 0) {
                     // triggerHostLeave(); 
                 }
+                */
             }
         }, 5000);
 
@@ -410,12 +428,16 @@
                     } else {
                         console.log('🆕 創建全新 Session');
                         sessionStartTime = new Date().toISOString().replace(/[:.]/g, '-');
-                        // 更新到房間資訊中
-                        await supabaseClient
-                            .from('rooms')
-                            .update({ session_start_time: sessionStartTime })
-                            .eq('room_id', MEETING_ID);
                     }
+
+                    // 🔴 確保房間處於 Active 狀態
+                    await supabaseClient
+                        .from('rooms')
+                        .update({
+                            session_start_time: sessionStartTime,
+                            is_active: true
+                        })
+                        .eq('room_id', MEETING_ID);
 
                     broadcastSessionStart(sessionStartTime);
                 } else {
@@ -1643,12 +1665,15 @@
                 // 移除所有遠端音訊元素
                 document.querySelectorAll('audio[id^="audio-"]').forEach(el => el.remove());
 
-                // 🟢 修正：如果是房主離開，清空 session_start_time，讓下一次啟動時能產生新 Session
+                // 🟢 修正：只有當房主主動點擊按鈕離開時，才關閉會議 (is_active = false)
                 if (isOwner) {
-                    console.log('👑 房主正在離開，清理房間 Session...');
+                    console.log('👑 房主正式關閉會議並離開...');
                     await supabaseClient
                         .from('rooms')
-                        .update({ session_start_time: null })
+                        .update({
+                            session_start_time: null,
+                            is_active: false
+                        })
                         .eq('room_id', MEETING_ID);
                 }
 
