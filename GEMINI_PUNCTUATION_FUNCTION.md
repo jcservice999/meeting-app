@@ -24,24 +24,30 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let originalText = "";
   try {
-    const { text } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    originalText = body.text || "";
     
-    if (!text || !text.trim()) {
-      return new Response(JSON.stringify({ result: text || "" }), {
+    if (!originalText || !originalText.trim()) {
+      return new Response(JSON.stringify({ result: originalText, success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
-      throw new Error("缺少 GEMINI_API_KEY");
+      console.error("缺少 GEMINI_API_KEY");
+      return new Response(JSON.stringify({ result: originalText, success: false, error: "Missing API Key" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    console.log("收到文字，長度:", text.length);
+    console.log("收到文字，長度:", originalText.length);
 
+    // 使用 gemini-1.5-flash 以獲得更穩定的回應
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -59,7 +65,7 @@ serve(async (req) => {
 - 不可改變語句順序
 - 只輸出處理後的文字，不要有任何說明或解釋
 
-原文：${text}`
+原文：${originalText}`
             }]
           }],
           generationConfig: {
@@ -74,10 +80,13 @@ serve(async (req) => {
     
     if (!response.ok) {
       console.error("Gemini API 錯誤:", JSON.stringify(data));
-      throw new Error(data.error?.message || "Gemini API 錯誤");
+      // 就算 API 報錯也回傳原文，不讓前端掛掉
+      return new Response(JSON.stringify({ result: originalText, success: false, error: data.error?.message }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
+    const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || originalText;
     console.log("處理成功，結果長度:", result.length);
 
     return new Response(JSON.stringify({ result, success: true }), {
@@ -85,9 +94,8 @@ serve(async (req) => {
     });
 
   } catch (e) {
-    console.error("Edge Function 錯誤:", e.message);
-    return new Response(JSON.stringify({ error: e.message, result: "" }), {
-      status: 500,
+    console.error("Edge Function 重大錯誤:", e.message);
+    return new Response(JSON.stringify({ result: originalText, success: false, error: e.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -97,19 +105,10 @@ serve(async (req) => {
 ## 部署步驟
 
 1. Supabase Dashboard → Edge Functions
-2. 點擊 **New Function**
+2. 點擊 **Create New Function**
 3. 名稱：`gemini-punctuation`
 4. 貼上上方程式碼
-5. 點擊 **Deploy**
-
-## 測試
-
-```bash
-curl -X POST https://YOUR_PROJECT.supabase.co/functions/v1/gemini-punctuation \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ANON_KEY" \
-  -d '{"text": "各位同學大家好今天我們來討論一下"}'
-```
+5. 點擊 **Save** 並確保已部署
 
 ## 限制
 
@@ -117,4 +116,4 @@ curl -X POST https://YOUR_PROJECT.supabase.co/functions/v1/gemini-punctuation \
 |------|----------|
 | 每分鐘 (RPM) | 15 |
 | 每日 (RPD) | 1,500 |
-| 每月 | 免費（無限） |
+| 每月 | 免費 |
