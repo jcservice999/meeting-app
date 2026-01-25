@@ -82,7 +82,7 @@ serve(async (req) => {
     formData.append("file", audioBlob, "audio.webm");
     formData.append("model", "whisper-large-v3-turbo");
     formData.append("language", language === "zh-TW" ? "zh" : "en");
-    formData.append("prompt", "這是一場專業會議轉錄。請確保將聽到的所有數字、金額（如：1,000）、日期、百分比以及科學數據精確地格式化為『阿拉伯數字』。");
+    formData.append("prompt", "這是一場專業會議轉錄。請確保將聽到的所有數字、金額、日期精確地格式化為『阿拉伯數字』。若音訊中僅有背景雜訊、完全安靜或無法辨識的人聲，請直接回傳『空字串』，不要產生任何文字。");
 
     const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST",

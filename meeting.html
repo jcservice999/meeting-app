@@ -146,6 +146,8 @@
         let recognition = null;
         let isRecording = false;
         let isSpeaking = false;
+        let audioLevel = 0; // 🟢 新增：音量等級
+        let speakingActivityDetected = false; // 🟢 新增：本次週期是否有捕捉到人聲
 
         // --- 語音轉錄全域變數 ---
         let audioContext = null;
@@ -227,7 +229,7 @@
 
             // 4. 其他初始化
             await loadRoomWordBoost();
-            initSpeechRecognition();
+            // initSpeechRecognition(); // ❌ 徹底關閉瀏覽器內建 STT，防止亂跳數字
         });
 
         // 初始化房間頻道與 Presence
@@ -713,25 +715,22 @@
         let recordingInterval = null;
         let audioChunks = [];
 
-        // 開始 AssemblyAI Batch 錄音
+        // 開始 Groq (Whisper) 轉錄模式
         async function startAssemblyAIBatch() {
             try {
                 // 優先使用現有麥克風串流
                 let streamToUse = localStream;
                 if (!streamToUse || !streamToUse.active) {
-                    console.log('🎤 請求新的麥克風權限 (Batch Mode)');
+                    console.log('🎤 請求新的麥克風權限 (Groq Mode)');
                     streamToUse = await navigator.mediaDevices.getUserMedia({
                         audio: { echoCancellation: true, noiseSuppression: true }
                     });
                     audioStream = streamToUse;
-                } else {
-                    console.log('🎤 重用現有麥克風串流 (Batch Mode)');
                 }
 
-                console.log('✅ AssemblyAI Batch 語音轉錄已啟動');
-                showInterimCaption('正在聆聽 (每 30 秒辨識一次)...');
+                console.log('✅ Groq 轉錄引擎已啟動');
+                showInterimCaption('模式：高精確度數據轉錄 (每 20 秒)...');
 
-                // ⚠️ 重要：先設定 isRecording，再啟動錄音循環
                 isRecording = true;
 
                 // 啟動錄音循環
@@ -740,76 +739,72 @@
 
             } catch (error) {
                 console.error('語音辨識初始化失敗:', error);
-                alert('語音辨識初始化失敗：' + error.message);
+                alert('麥克風啟動失敗：' + error.message);
                 return false;
             }
         }
 
-        // 錄音循環 - 無縫錄音版
+        // 錄音循環 - 帶有 VAD (靜音偵測) 的穩健版本
         function startRecordingLoop(stream) {
-            console.log('🔄 startRecordingLoop 被調用, isRecording =', isRecording);
+            console.log('🔄 啟動錄音循環控制...');
             const language = document.getElementById('languageSelect').value;
 
             function recordNextChunk() {
-                console.log('🎙️ recordNextChunk 被調用, isRecording =', isRecording);
-                if (!isRecording) {
-                    console.log('⚠️ isRecording 為 false，退出錄音');
-                    return;
-                }
+                if (!isRecording) return;
 
                 audioChunks = [];
+                speakingActivityDetected = false; // 🟢 重置本次週期的說話偵測
 
                 try {
                     mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-                    console.log('✅ MediaRecorder 創建成功 (opus)');
                 } catch (e) {
-                    console.log('⚠️ opus 不支援，使用預設格式');
                     mediaRecorder = new MediaRecorder(stream);
                 }
 
                 mediaRecorder.ondataavailable = (event) => {
                     if (event.data.size > 0) {
                         audioChunks.push(event.data);
-                        console.log('📥 收到音訊數據:', event.data.size, 'bytes');
+
+                        // 🟢 VAD 檢查：如果目前正在說話 (analyser 判定)，標記此區段有效
+                        if (isSpeaking) {
+                            speakingActivityDetected = true;
+                        }
                     }
                 };
 
                 mediaRecorder.onstop = async () => {
-                    console.log('⏹️ MediaRecorder 停止，audioChunks.length =', audioChunks.length);
+                    const chunksToProcess = [...audioChunks];
 
-                    // ⚠️ 關鍵修正：先保存當前的 chunks，再開始下一輪
-                    const chunksToProcess = [...audioChunks]; // 複製一份
-
-                    // 馬上開始下一段，把空窗期縮到最小
+                    // 立即開始下一段，不要等待上傳完成
                     if (isRecording) {
                         recordNextChunk();
                     }
 
-                    // 用保存的 chunks 來處理（不會被新錄音覆蓋）
+                    // 🔴 幻覺預防：如果這 20 秒內完全沒人說話，直接放棄這段音訊，不丟 API
+                    if (!speakingActivityDetected) {
+                        console.log('🔇 本週期完全無聲音活動，跳過 API 調用 (防止幻覺)');
+                        return;
+                    }
+
                     if (chunksToProcess.length === 0) return;
 
                     const audioBlob = new Blob(chunksToProcess, { type: 'audio/webm' });
-                    console.log('📦 準備上傳 Blob:', audioBlob.size, 'bytes');
-                    if (audioBlob.size < 1000) return;
+                    console.log('📦 偵測到聲音活動，準備送往 Groq:', audioBlob.size, 'bytes');
+                    if (audioBlob.size < 2000) return;
 
-                    // 非同步上傳，不阻擋錄音
                     processAudioChunk(audioBlob, language);
                 };
 
-                mediaRecorder.start();
-                console.log('▶️ MediaRecorder 開始錄音');
+                mediaRecorder.start(1000); // 🟢 每秒觸發一次 dataavailable 用於檢查 isSpeaking
 
-                // 20秒後停止這一段 -> 觸發 onstop -> 立即開始下一段
+                // 定時停止並觸發轉錄
                 setTimeout(() => {
                     if (mediaRecorder && mediaRecorder.state === 'recording') {
-                        console.log('⏰ 20秒到，停止錄音');
                         mediaRecorder.stop();
                     }
-                }, 20000);
+                }, 20000); // 20 秒週期
             }
 
-            // 啟動第一次
-            console.log('🚀 即將啟動第一次 recordNextChunk');
             recordNextChunk();
         }
 
@@ -821,7 +816,7 @@
                     const { data: { session } } = await supabaseClient.auth.getSession();
                     if (!session) return;
 
-                    console.log('📤 呼叫 Groq (Whisper v3 Turbo) 進行高精確度轉錄...');
+                    console.log('📤 請求 Groq (Whisper v3 Turbo) 轉錄');
 
                     // 呼叫 Groq 函數
                     const response = await fetch(GROQ_URL, {
@@ -837,32 +832,21 @@
                         })
                     });
 
-                    if (!response.ok) {
-                        const errText = await response.text().catch(() => 'No body');
-                        throw new Error(`Status ${response.status}: ${errText}`);
-                    }
+                    if (!response.ok) throw new Error(`Groq API error: ${response.status}`);
 
                     const result = await response.json();
+                    if (result.error || !result.transcript) return;
 
-                    if (result.error) {
-                        console.error('❌ Groq 錯誤:', result.error);
-                        return;
-                    }
+                    console.log('🎯 Groq 轉錄成功:', result.transcript);
 
-                    console.log('🎯 Groq 辨識成功:', result.transcript);
-
-                    const transcript = result.transcript || "";
-                    if (transcript.trim()) {
-                        // 處理數據提取
+                    const transcript = result.transcript.trim();
+                    if (transcript) {
+                        // 🟢 唯一來源：數值標籤與文字全部來自 Groq
                         const numericalTags = getNumericalTags(transcript);
 
-                        // 使用現有的加標點功能（雖然 Whisper 已經有標點，但過一次校正更穩）
-                        let processedText = await addPunctuation(transcript);
-
-                        if (processedText) {
-                            showLocalCaption(processedText, numericalTags);
-                            saveCaption(processedText, true);
-                        }
+                        // 🔴 徹底移除 addPunctuation，直接顯示 Groq 原文
+                        showLocalCaption(transcript, numericalTags);
+                        saveCaption(transcript, true);
                     }
 
                 } catch (error) {
