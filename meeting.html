@@ -395,9 +395,28 @@
                 }
 
                 if (isOwner) {
-                    console.log('👑 您是此會議室的真正房主');
-                    sessionStartTime = new Date().toISOString().replace(/[:.]/g, '-'); // 🟢 生成唯一 Session 標識
-                    // 廣播與 Presence 更新
+                    console.log('👑 您是此會議室的真正房主，正在嘗試恢復或重置 Session...');
+
+                    // 🟢 修正：優先從 rooms 表看有沒有既存的 session_start_time (防止重新整理遺失紀錄)
+                    const { data: currentRoom } = await supabaseClient
+                        .from('rooms')
+                        .select('session_start_time')
+                        .eq('room_id', MEETING_ID)
+                        .single();
+
+                    if (currentRoom && currentRoom.session_start_time) {
+                        console.log('📜 恢復既存 Session:', currentRoom.session_start_time);
+                        sessionStartTime = currentRoom.session_start_time;
+                    } else {
+                        console.log('🆕 創建全新 Session');
+                        sessionStartTime = new Date().toISOString().replace(/[:.]/g, '-');
+                        // 更新到房間資訊中
+                        await supabaseClient
+                            .from('rooms')
+                            .update({ session_start_time: sessionStartTime })
+                            .eq('room_id', MEETING_ID);
+                    }
+
                     broadcastSessionStart(sessionStartTime);
                 } else {
                     isOwner = false;
@@ -1623,6 +1642,15 @@
                 }
                 // 移除所有遠端音訊元素
                 document.querySelectorAll('audio[id^="audio-"]').forEach(el => el.remove());
+
+                // 🟢 修正：如果是房主離開，清空 session_start_time，讓下一次啟動時能產生新 Session
+                if (isOwner) {
+                    console.log('👑 房主正在離開，清理房間 Session...');
+                    await supabaseClient
+                        .from('rooms')
+                        .update({ session_start_time: null })
+                        .eq('room_id', MEETING_ID);
+                }
 
                 console.log('✅ 已離開會議');
             } catch (error) {

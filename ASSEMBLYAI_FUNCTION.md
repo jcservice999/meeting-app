@@ -1,6 +1,6 @@
-# AssemblyAI 語音轉錄 - Edge Function
+# AssemblyAI 語音轉錄 - Edge Function (穩定強化版)
 
-## 完整程式碼（使用房間創建者的 API Key）
+## 完整程式碼
 
 函數名稱：`assemblyai-speech`
 
@@ -35,73 +35,47 @@ serve(async (req) => {
 
     const { audio, language, roomId, wordBoost } = await req.json();
     
-    if (!audio || audio.length < 5000) {
+    // 🔴 修正：更寬鬆的音訊長度檢查，避免短語被過濾
+    if (!audio || audio.length < 1000) {
       return new Response(JSON.stringify({ transcript: "", success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    // 取得房間創建者的 ID
-    let ownerId = user.id; // 預設使用當前使用者
-    
+    let ownerId = user.id;
     if (roomId && roomId !== 'main-room') {
-      const { data: room } = await supabase
-        .from('rooms')
-        .select('created_by')
-        .eq('room_id', roomId)
-        .single();
-      
-      if (room && room.created_by) {
-        ownerId = room.created_by;
-        console.log("Using room creator's API key:", ownerId);
-      }
+      const { data: room } = await supabase.from('rooms').select('created_by').eq('room_id', roomId).single();
+      if (room && room.created_by) ownerId = room.created_by;
     }
 
-    // 取得房間創建者的有效 API Key
     const { data: accounts } = await supabase
       .from('speech_api_accounts')
       .select('id, api_key')
       .eq('user_id', ownerId)
       .eq('provider', 'assemblyai')
       .eq('api_exhausted', false)
-      .order('is_active', { ascending: false })
       .limit(1);
 
     if (!accounts || accounts.length === 0) {
-      return new Response(JSON.stringify({ 
-        error: "Room creator has no active AssemblyAI API key" 
-      }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+        throw new Error("No active AssemblyAI key found");
     }
 
     const apiKey = accounts[0].api_key;
     const accountId = accounts[0].id;
 
-    // 1. 上傳音訊到 AssemblyAI
+    // 1. 上傳
     const binaryAudio = Uint8Array.from(atob(audio), c => c.charCodeAt(0));
-    
     const uploadRes = await fetch("https://api.assemblyai.com/v2/upload", {
       method: "POST",
       headers: { "Authorization": apiKey },
       body: binaryAudio
     });
 
-    if (!uploadRes.ok) {
-      if (uploadRes.status === 402 || uploadRes.status === 429) {
-        await supabase.from('speech_api_accounts')
-          .update({ api_exhausted: true, exhausted_at: new Date().toISOString() })
-          .eq('id', accountId);
-        return new Response(JSON.stringify({ error: "API quota exhausted" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      throw new Error("Upload failed");
-    }
+    if (!uploadRes.ok) throw new Error("Upload to AssemblyAI failed");
 
     const { upload_url } = await uploadRes.json();
 
-    // 2. 建立轉錄（輪詢模式）
+    // 2. 轉錄
     const transcriptRes = await fetch("https://api.assemblyai.com/v2/transcript", {
       method: "POST",
       headers: { "Authorization": apiKey, "Content-Type": "application/json" },
@@ -109,18 +83,16 @@ serve(async (req) => {
         audio_url: upload_url,
         language_code: language === "zh-TW" ? "zh" : "en",
         speech_model: "best",
-        word_boost: wordBoost || [],
-        boost_param: "default",
-        punctuate: true,
-        format_text: true
+        word_boost: wordBoost || []
       })
     });
 
+    if (!transcriptRes.ok) throw new Error("Transcription request failed");
     const { id: transcriptId } = await transcriptRes.json();
 
-    // 3. 等待結果（最多 30 秒）
+    // 3. 輪詢結果 (最多等待 25 秒，增加穩定性)
     let transcript = "";
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 25; i++) {
       await new Promise(r => setTimeout(r, 1000));
       const pollRes = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
         headers: { "Authorization": apiKey }
@@ -140,18 +112,10 @@ serve(async (req) => {
     });
 
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
+    console.error("AssemblyAI Edge Error:", e.message);
+    return new Response(JSON.stringify({ error: e.message, success: false }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
 });
 ```
-
----
-
-## 更新步驟
-
-1. 在 Supabase Dashboard → Edge Functions → `assemblyai-speech`
-2. 用上面的程式碼替換
-3. 確保關閉 JWT Verification
-4. 部署
